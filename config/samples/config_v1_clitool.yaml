@@ -1,0 +1,7 @@
+apiVersion: config.openshift.io/v1
+kind: CLITool
+metadata:
+  name: clitool-sample
+spec:
+  # Add fields here
+  foo: bar

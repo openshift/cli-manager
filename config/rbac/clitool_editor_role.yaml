@@ -1,0 +1,24 @@
+# permissions for end users to edit clitools.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: clitool-editor-role
+rules:
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - clitools
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - clitools/status
+  verbs:
+  - get

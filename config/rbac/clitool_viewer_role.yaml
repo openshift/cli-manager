@@ -1,0 +1,20 @@
+# permissions for end users to view clitools.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: clitool-viewer-role
+rules:
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - clitools
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - clitools/status
+  verbs:
+  - get
