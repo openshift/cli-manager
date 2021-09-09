@@ -27,6 +27,7 @@ func (v *V1) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/tools/download/", v.downloadTool)
 }
 
+// responseUserError returns a JSON error object to the requestor.
 func (v *V1) respondUserError(w http.ResponseWriter, code int, err error) {
 	msg := map[string]string{
 		"error": err.Error(),
@@ -34,15 +35,18 @@ func (v *V1) respondUserError(w http.ResponseWriter, code int, err error) {
 	v.respondJSONWithCode(w, code, msg)
 }
 
+// responseSystemError returns a JSON error object to the requestor, and adds an entry to the controller's error log.
 func (v *V1) respondSystemError(w http.ResponseWriter, code int, err error, while string) {
 	v.respondUserError(w, code, err)
 	v.log.Error(err, while)
 }
 
+// respondJSON is a helper method for returning a JSON object with HTTP status code 200.
 func (v *V1) respondJSON(w http.ResponseWriter, val interface{}) {
 	v.respondJSONWithCode(w, http.StatusOK, val)
 }
 
+// respondJSONWithCode is a helper method for returning a JSON object with a custom HTTP status code.
 func (v *V1) respondJSONWithCode(w http.ResponseWriter, code int, val interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
