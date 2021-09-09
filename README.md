@@ -56,3 +56,19 @@ Example:
 ]
 ```
 
+### `GET /v1/tools/download/`
+Download a tool.
+
+#### Request
+The following query parameters are required:
+* `name`: Name of the tool
+* `os`: Operating system for the tool
+* `arch`: CPU architecture for the tool
+
+Example:
+```http
+GET /v1/tools/download/?name=oc&os=linux&arch=amd64
+```
+
+#### Response
+A successful response will contain the raw binary of the tool for the requested operating system and architecture.
