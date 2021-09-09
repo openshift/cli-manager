@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sort"
 
 	configv1 "github.com/deejross/openshift-cli-manager/api/v1"
 	"github.com/deejross/openshift-cli-manager/pkg/image"
@@ -27,8 +28,42 @@ func (v *V1) listTools(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// format list output
+	type platform struct {
+		OS   string `json:"os"`
+		Arch string `json:"arch"`
+	}
+	type tool struct {
+		Name        string     `json:"name"`
+		Description string     `json:"description"`
+		Platforms   []platform `json:"platforms"`
+	}
+
+	out := []tool{}
+	for _, r := range list.Items {
+		t := tool{
+			Name:        r.Name,
+			Description: r.Spec.Description,
+			Platforms:   []platform{},
+		}
+
+		for _, b := range r.Spec.Binaries {
+			t.Platforms = append(t.Platforms, platform{
+				OS:   b.OS,
+				Arch: b.Architecture,
+			})
+		}
+
+		out = append(out, t)
+	}
+
+	// sort the output by tool name
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Name < out[j].Name
+	})
+
 	// output list as JSON
-	v.respondJSON(w, list)
+	v.respondJSON(w, out)
 }
 
 func (v *V1) downloadTool(w http.ResponseWriter, r *http.Request) {
