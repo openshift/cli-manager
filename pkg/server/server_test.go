@@ -37,7 +37,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	toolsv1 "github.com/deejross/openshift-cli-manager/api/v1"
+	configv1 "github.com/deejross/openshift-cli-manager/api/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -70,7 +70,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = toolsv1.AddToScheme(scheme.Scheme)
+	err = configv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
@@ -83,14 +83,14 @@ var _ = BeforeSuite(func() {
 	handler = NewHTTPHandler(cli, log)
 
 	// load some test resources
-	tool := &toolsv1.CLITool{
+	tool := &configv1.CLITool{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "sh",
 			Namespace: "default",
 		},
-		Spec: toolsv1.CLIToolSpec{
+		Spec: configv1.CLIToolSpec{
 			Description: "just a test",
-			Binaries: []toolsv1.CLIToolBinary{
+			Binaries: []configv1.CLIToolBinary{
 				{
 					OS:           "linux",
 					Architecture: "amd64",
@@ -156,7 +156,7 @@ var _ = Describe("tools", func() {
 
 		Expect(rec.Code).To(Equal(http.StatusOK))
 
-		list := &toolsv1.CLIToolList{}
+		list := &configv1.CLIToolList{}
 		err := json.NewDecoder(rec.Body).Decode(list)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(list.Items).To(HaveLen(1))
@@ -170,7 +170,7 @@ var _ = Describe("tools", func() {
 
 		Expect(rec.Code).To(Equal(http.StatusOK))
 
-		list := &toolsv1.CLIToolList{}
+		list := &configv1.CLIToolList{}
 		err := json.NewDecoder(rec.Body).Decode(list)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(list.Items).To(HaveLen(1))

@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	toolsv1 "github.com/deejross/openshift-cli-manager/api/v1"
+	configv1 "github.com/deejross/openshift-cli-manager/api/v1"
 )
 
 // CLIToolReconciler reconciles a CLITool object
@@ -57,6 +57,6 @@ func (r *CLIToolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // SetupWithManager sets up the controller with the Manager.
 func (r *CLIToolReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&toolsv1.CLITool{}).
+		For(&configv1.CLITool{}).
 		Complete(r)
 }
