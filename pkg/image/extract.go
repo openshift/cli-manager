@@ -16,7 +16,6 @@ type Target struct {
 	Destination io.Writer
 
 	// Source is the file to extract from the image.
-	// If Source is a directory, the directory will be extracted as a tarball.
 	Source string
 }
 
@@ -26,12 +25,12 @@ type ExtractOptions struct {
 	// If this is set, the Targets option is ignored.
 	Tarball io.Writer
 
-	// Targets are a pair of source files or directories within the image to copy to the local disk.
+	// Targets are a list of source files within the image to copy paired with a destination io.Writer.
 	// The same `Target.Source` cannot be specified more than once per extract.
 	Targets []Target
 }
 
-// Extract an image's filesystem as a tarball, or individual files and directories from the image.
+// Extract an image's filesystem as a tarball, or individual files from the image.
 func Extract(img v1.Image, opts *ExtractOptions) error {
 	if opts.Tarball != nil {
 		return crane.Export(img, opts.Tarball)
