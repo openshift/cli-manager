@@ -23,6 +23,10 @@ func NewV1(cli client.Client, logger logr.Logger) *V1 {
 
 // RegisterRoutes registers all V1 routes on the given `http.ServeMux`.
 func (v *V1) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/v1/", func(w http.ResponseWriter, r *http.Request) {
+		v.respondJSON(w, map[string]string{"name": "openshift-cli-manager"})
+	})
+
 	mux.HandleFunc("/v1/tools/", v.listTools)
 	mux.HandleFunc("/v1/tools/download/", v.downloadTool)
 }
