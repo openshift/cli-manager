@@ -28,48 +28,25 @@ func (v *V1) listTools(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// format list output
-	type platform struct {
-		OS   string `json:"os"`
-		Arch string `json:"arch"`
-	}
-	type tool struct {
-		Name        string     `json:"name"`
-		Description string     `json:"description"`
-		Platforms   []platform `json:"platforms"`
-	}
-
-	out := []tool{}
-	for _, r := range list.Items {
-		t := tool{
-			Name:        r.Name,
-			Description: r.Spec.Description,
-			Platforms:   []platform{},
-		}
-
-		for _, b := range r.Spec.Binaries {
-			t.Platforms = append(t.Platforms, platform{
-				OS:   b.OS,
-				Arch: b.Architecture,
-			})
-		}
-
-		out = append(out, t)
-	}
-
 	// sort the output by tool name
-	sort.Slice(out, func(i, j int) bool {
-		return out[i].Name < out[j].Name
+	sort.Slice(list.Items, func(i, j int) bool {
+		return list.Items[i].Name < list.Items[j].Name
 	})
 
 	// output list as JSON
-	v.respondJSON(w, out)
+	v.respondJSON(w, list)
 }
 
 func (v *V1) downloadTool(w http.ResponseWriter, r *http.Request) {
 	// validate user input
 	if r.Method != "GET" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	namespace := r.URL.Query().Get("namespace")
+	if len(namespace) == 0 {
+		v.respondUserError(w, 400, fmt.Errorf("missing namespace in query"))
 		return
 	}
 
@@ -93,18 +70,18 @@ func (v *V1) downloadTool(w http.ResponseWriter, r *http.Request) {
 
 	// get the requested CLITool resources
 	tool := &configv1.CLITool{}
-	if err := v.cli.Get(context.Background(), types.NamespacedName{Name: name}, tool); err != nil {
+	if err := v.cli.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: name}, tool); err != nil {
 		if errors.IsNotFound(err) {
 			v.respondUserError(w, 404, err)
 			return
 		}
-		v.respondSystemError(w, 500, err, fmt.Sprintf("getting CLITool: name: %s, os: %s, arch: %s", name, operatingSystem, architecture))
+		v.respondSystemError(w, 500, err, fmt.Sprintf("getting CLITool: name: %s/%s, os: %s, arch: %s", namespace, name, operatingSystem, architecture))
 		return
 	}
 
 	// make sure there are binaries within the CLITool resource
 	if tool.Spec.Binaries == nil || len(tool.Spec.Binaries) == 0 {
-		v.respondSystemError(w, 500, fmt.Errorf("misconfigured CLITool: name: %s, error: there are no binaries specified for the given CLITool", name), "validating CLITool binaries")
+		v.respondSystemError(w, 500, fmt.Errorf("misconfigured CLITool: name: %s/%s, error: there are no binaries specified for the given CLITool", namespace, name), "validating CLITool binaries")
 		return
 	}
 
@@ -119,7 +96,7 @@ func (v *V1) downloadTool(w http.ResponseWriter, r *http.Request) {
 
 	// return an error if there is no binary for the given operating system and architecture combination
 	if binary == nil {
-		v.respondUserError(w, 404, fmt.Errorf("desired CLITool does not have a binary for the requested os and arch combination: name: %s, os: %s, arch: %s", name, operatingSystem, architecture))
+		v.respondUserError(w, 404, fmt.Errorf("desired CLITool does not have a binary for the requested os and arch combination: name: %s/%s, os: %s, arch: %s", namespace, name, operatingSystem, architecture))
 		return
 	}
 
@@ -128,14 +105,14 @@ func (v *V1) downloadTool(w http.ResponseWriter, r *http.Request) {
 	if len(binary.ImagePullSecret) > 0 {
 		// if an imagePullSecret is defined for the binary, retrieve the Secret for it
 		imagePullSecret := &corev1.Secret{}
-		if err := v.cli.Get(context.Background(), types.NamespacedName{Name: binary.ImagePullSecret}, imagePullSecret); err != nil {
-			v.respondSystemError(w, 500, fmt.Errorf("misconfigured CLITool: name: %s, os: %s, arch: %s, error: %v", name, operatingSystem, architecture, err), "getting imagePullSecret: name: "+binary.ImagePullSecret)
+		if err := v.cli.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: binary.ImagePullSecret}, imagePullSecret); err != nil {
+			v.respondSystemError(w, 500, fmt.Errorf("misconfigured CLITool: name: %s/%s, os: %s, arch: %s, error: %v", namespace, name, operatingSystem, architecture, err), "getting imagePullSecret: name: "+binary.ImagePullSecret)
 			return
 		}
 
 		// ensure the Secret is of the expected type
 		if imagePullSecret.Type != corev1.SecretTypeDockercfg {
-			v.respondSystemError(w, 500, fmt.Errorf("misconfigured CLITool: name: %s, os: %s, arch: %s, error: configured imagePullSecret for give os and arch combination is not of type: %s", name, operatingSystem, architecture, corev1.SecretTypeDockercfg), "getting imagePullSecret: name: "+binary.ImagePullSecret)
+			v.respondSystemError(w, 500, fmt.Errorf("misconfigured CLITool: name: %s/%s, os: %s, arch: %s, error: configured imagePullSecret for give os and arch combination is not of type: %s", namespace, name, operatingSystem, architecture, corev1.SecretTypeDockercfg), "getting imagePullSecret: name: "+binary.ImagePullSecret)
 			return
 		}
 
@@ -146,7 +123,7 @@ func (v *V1) downloadTool(w http.ResponseWriter, r *http.Request) {
 	// attempt to pull the image down locally
 	img, err := image.Pull(binary.Image, pullOptions)
 	if err != nil {
-		v.respondSystemError(w, 500, fmt.Errorf("could not pull image: name: %s, error: %v", binary.Image, err), fmt.Sprintf("pulling image for CLITool: name: %s, os: %s, arch: %s", name, operatingSystem, architecture))
+		v.respondSystemError(w, 500, fmt.Errorf("could not pull image: name: %s, error: %v", binary.Image, err), fmt.Sprintf("pulling image for CLITool: name: %s/%s, os: %s, arch: %s", namespace, name, operatingSystem, architecture))
 		return
 	}
 
@@ -173,7 +150,7 @@ func (v *V1) downloadTool(w http.ResponseWriter, r *http.Request) {
 
 	// attempt to extract and write the raw binary to the body of the response
 	if err := image.Extract(img, extractOptions); err != nil {
-		v.respondSystemError(w, 500, fmt.Errorf("unable to extract tool from image: name: %s, image: %s, os: %s, arch: %s, path: %s, error: %v", name, binary.Image, operatingSystem, architecture, binary.Path, err), "extracting tool from image")
+		v.respondSystemError(w, 500, fmt.Errorf("unable to extract tool from image: name: %s/%s, image: %s, os: %s, arch: %s, path: %s, error: %v", namespace, name, binary.Image, operatingSystem, architecture, binary.Path, err), "extracting tool from image")
 		return
 	}
 }

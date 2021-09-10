@@ -45,7 +45,7 @@ type CLIToolBinary struct {
 
 	// Architecture is the CPU architecture for given binary (i.e. amd64, arm64)
 	// +required
-	Architecture string `json:"architecture,omitempty"`
+	Architecture string `json:"arch,omitempty"`
 
 	// Image containing CLI tool
 	// +required

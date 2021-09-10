@@ -19,7 +19,6 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -85,7 +84,7 @@ var _ = BeforeSuite(func() {
 	// load some test resources
 	tool := &configv1.CLITool{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "sh",
+			Name:      "bash",
 			Namespace: "default",
 		},
 		Spec: configv1.CLIToolSpec{
@@ -94,8 +93,8 @@ var _ = BeforeSuite(func() {
 				{
 					OS:           "linux",
 					Architecture: "amd64",
-					Image:        "busybox:latest",
-					Path:         "/bin/sh",
+					Image:        "redhat/ubi8-micro:latest",
+					Path:         "/usr/bin/bash",
 				},
 			},
 		},
@@ -126,7 +125,6 @@ var _ = Describe("v1", func() {
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
-		fmt.Print(rec.Header())
 		Expect(rec.Code).To(Equal(http.StatusOK))
 		Expect(rec.Body.String()).To(ContainSubstring("body"))
 	})
@@ -159,8 +157,13 @@ var _ = Describe("tools", func() {
 		list := &configv1.CLIToolList{}
 		err := json.NewDecoder(rec.Body).Decode(list)
 		Expect(err).NotTo(HaveOccurred())
+		Expect(rec.Header().Get("Content-Type")).To(Equal("application/json"))
 		Expect(list.Items).To(HaveLen(1))
-		Expect(list.Items[0].ObjectMeta.Name).To(Equal("sh"))
+		Expect(list.Items[0].Name).To(Equal("bash"))
+		Expect(list.Items[0].Spec.Binaries).NotTo(BeEmpty())
+		Expect(list.Items[0].Spec.Binaries[0].Architecture).To(Equal("amd64"))
+		Expect(list.Items[0].Spec.Binaries[0].OS).To(Equal("linux"))
+		Expect(list.Items[0].Spec.Binaries[0].Path).To(Equal("/usr/bin/bash"))
 	})
 
 	It("should not list unexpected CLITools", func() {
@@ -173,7 +176,20 @@ var _ = Describe("tools", func() {
 		list := &configv1.CLIToolList{}
 		err := json.NewDecoder(rec.Body).Decode(list)
 		Expect(err).NotTo(HaveOccurred())
+		Expect(rec.Header().Get("Content-Type")).To(Equal("application/json"))
 		Expect(list.Items).To(HaveLen(1))
-		Expect(list.Items[0].ObjectMeta.Name).NotTo(Equal("bash"))
+		Expect(list.Items[0].Name).NotTo(Equal("curl"))
+	})
+
+	It("should download the requested CLITool", func() {
+		req := httptest.NewRequest("GET", "/v1/tools/download/?namespace=default&name=bash&os=linux&arch=amd64", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		Expect(rec.Code).To(Equal(http.StatusOK))
+		Expect(rec.Header().Get("Content-Type")).To(Equal("application/octet-stream"))
+		Expect(rec.Header().Get("Content-Disposition")).To(Equal("attachment; filename=bash"))
+		Expect(rec.Header().Get("Content-Transfer-Encoding")).To(Equal("binary"))
+		Expect(rec.Body.Bytes()).NotTo(BeEmpty())
 	})
 })

@@ -42,7 +42,7 @@ spec:
                   description: CLIToolBinary defines per-OS and per-Arch binaries
                     for the given tool.
                   properties:
-                    architecture:
+                    arch:
                       description: Architecture is the CPU architecture for given
                         binary (i.e. amd64, arm64)
                       type: string

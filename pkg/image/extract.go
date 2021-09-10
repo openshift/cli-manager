@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/go-containerregistry/pkg/crane"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -102,7 +103,7 @@ func Extract(img v1.Image, opts *ExtractOptions) error {
 
 			// determine if we care about the given file
 			for _, target := range opts.Targets {
-				if header.Name == target.Source {
+				if header.Name == strings.TrimPrefix(target.Source, "/") {
 					processedTargets[header.Name] = struct{}{}
 					if _, err := io.Copy(target.Destination, tarReader); err != nil {
 						return fmt.Errorf("could not copy %s: %v", header.Name, err)

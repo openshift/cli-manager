@@ -7,6 +7,35 @@ In disconnected environments, it is more difficult to install and manage CLI too
 ## Design
 This controller leverages images and registries for providing tools. This works by including any CLI tools desired into an image that is reachable from the cluster. This controller will pull this image, and extract the desired tool from the image's filesystem. Cluster administrators define `CLITool` custom resources which describe tool, the image:tag, and the path within the image to extract. Users can then download tools via this controller's API. Consuming this API is made more convenient with its integration into `oc`.
 
+## Configuration
+By default, this controller will watch `CLITool` resources in all namespaces. To restrict watching to a single namespace, set the `WATCH_NAMESPACE` environment variable.
+
+## `CLITool` Specification
+The spec has the following fields:
+* `description`: User-friendly description of the tool
+* `binaries`: List of binaries available for the tool based on operating system and CPU architecture each binary is compiled for
+    * `os`: Operating system for the binary
+    * `arch`: CPU architecture for the binary
+    * `image`: Image name with tag to pull
+    * `path`: The path to the binary within the image to extract
+    * `imagePullSecret`: If authentication to the image registry is required, provide the name of the `dockercfg` Secret where the authentication information can be found
+
+Example:
+```yaml
+apiVersion: config.openshift.io/v1
+kind: CLITool
+metadata:
+  name: bash
+  namespace: default
+spec:
+  description: just a test
+  binaries:
+  - os: linux
+    arch: amd64
+    image: redhat/ubi8-micro:latest
+    path: /usr/bin/bash
+```
+
 ## API Endpoints
 ### `GET/LIST /v1/tools/`
 List available tools.
@@ -24,36 +53,29 @@ Fields:
 
 Example:
 ```json
-[
+{
+  "items": [
     {
-        "name": "kubectl",
-        "description": "Kubernetes cluster manager",
-        "platforms": [
-            {
-                "os": "darwin",
-                "arch": "amd64",
-            },
-            {
-                "os": "linux",
-                "arch": "amd64",
-            }
+      "kind": "CLITool",
+      "apiVersion": "config.openshift.io/v1",
+      "metadata": {
+        "name": "bash",
+        "namespace": "default",
+      },
+      "spec": {
+        "description": "just a test",
+        "binaries": [
+          {
+            "os": "linux",
+            "arch": "amd64",
+            "image": "redhat/ubi8-micro:latest",
+            "path": "/usr/bin/bash"
+          }
         ]
-    },
-    {
-        "name": "oc",
-        "description": "OpenShift cluster manager",
-        "platforms": [
-            {
-                "os": "darwin",
-                "arch": "amd64",
-            },
-            {
-                "os": "linux",
-                "arch": "amd64",
-            }
-        ]
+      }
     }
-]
+  ]
+}
 ```
 
 ### `GET /v1/tools/download/`
@@ -61,13 +83,14 @@ Download a tool.
 
 #### Request
 The following query parameters are required:
-* `name`: Name of the tool
-* `os`: Operating system for the tool
-* `arch`: CPU architecture for the tool
+* `namespace`: Namespace for the CLITool resource
+* `name`: Name of the CLITool resource
+* `os`: Operating system for the binary
+* `arch`: CPU architecture for the binary
 
 Example:
 ```http
-GET /v1/tools/download/?name=oc&os=linux&arch=amd64
+GET /v1/tools/download/?namespace=default&name=bash&os=linux&arch=amd64
 ```
 
 #### Response
