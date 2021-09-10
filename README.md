@@ -36,6 +36,20 @@ spec:
     path: /usr/bin/bash
 ```
 
+### Available operating systems and CPU architectures
+The most common are:
+* `os`:
+  * `darwin` (i.e. MacOS)
+  * `linux`
+  * `windows`
+* `arch`:
+  * `386`
+  * `amd64`
+  * `arm`
+  * `arm64`
+
+A complete list of all supported operating systems and architectures can be found here: https://github.com/golang/go/blob/master/src/go/build/syslist.go
+
 ## API Endpoints
 ### `GET/LIST /v1/tools/`
 List available tools.
