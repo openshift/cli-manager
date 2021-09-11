@@ -23,53 +23,69 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// CLIToolSpec defines the desired state of CLITool
+// CLIToolSpec defines the desired state of CLITool.
 type CLIToolSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Description of the CLI tool
+	// Description of the CLI tool.
 	// +optional
 	Description string `json:"description,omitempty"`
 
-	// Binaries for the CLI tool
+	// Versions of the CLI tool.
 	// +required
-	Binaries []CLIToolBinary `json:"binaries,omitempty"`
+	Versions []CLIToolVersion `json:"versions,omitempty"`
+}
+
+// CLIToolVersion defines a version number for the tool.
+type CLIToolVersion struct {
+	// Version is the name or number of the version.
+	// +required
+	Version string `json:"version,omitempty"`
+
+	// Binaries is a list of binaries for the given version.
+	// +required
+	Binaries []CLIToolVersionBinary `json:"binaries,omitempty"`
 }
 
 // CLIToolBinary defines per-OS and per-Arch binaries for the given tool.
-type CLIToolBinary struct {
-	// OS is the operating system for the given binary (i.e. linux, darwin, windows)
+type CLIToolVersionBinary struct {
+	// Platform for the given binary (i.e. linux/amd64, darwin/amd64, windows/amd64).
 	// +required
-	OS string `json:"os,omitempty"`
+	Platform string `json:"platform,omitempty"`
 
-	// Architecture is the CPU architecture for given binary (i.e. amd64, arm64)
-	// +required
-	Architecture string `json:"arch,omitempty"`
-
-	// Image containing CLI tool
+	// Image containing CLI tool.
 	// +required
 	Image string `json:"image,omitempty"`
 
-	// ImagePullSecret to use when connecting to an image registry that requires authentication
+	// ImagePullSecret to use when connecting to an image registry that requires authentication.
 	// +optional
 	ImagePullSecret string `json:"imagePullSecret,omitempty"`
 
-	// Path is the location within the image where the CLI tool can be found
+	// Path is the location within the image where the CLI tool can be found.
 	// +required
 	Path string `json:"path,omitempty"`
 }
 
+// CLIToolStatusDigest provides information about a hash for a tool's version/platform binary combination.
+type CLIToolStatusDigest struct {
+	// Name is the version/platform for the hash.
+	Name string `json:"name,omitempty"`
+
+	// Digest is the text representation of the hash.
+	Digest string `json:"value,omitempty"`
+
+	// Calculated is when the hash was calculated.
+	Calculated metav1.Timestamp `json:"calculated,omitempty"`
+}
+
 // CLIToolStatus defines the observed state of CLITool
 type CLIToolStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Digests is a list of calculated hashes for a tool's version/platform combination.
+	Digests []CLIToolStatusDigest `json:"hashes,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// CLITool is the Schema for the clitools API
+// CLITool is the Schema for the clitools API.
 type CLITool struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -80,11 +96,33 @@ type CLITool struct {
 
 //+kubebuilder:object:root=true
 
-// CLIToolList contains a list of CLITool
+// CLIToolList contains a list of CLITool.
 type CLIToolList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []CLITool `json:"items"`
+}
+
+// HTTPCLIToolListItem is the CLITool object represented by the controller's HTTP list endpoint.
+type HTTPCLIToolListItem struct {
+	Namespace     string   `json:"namespace"`
+	Name          string   `json:"name"`
+	Description   string   `json:"description"`
+	LatestVersion string   `json:"latestVersion"`
+	Platforms     []string `json:"platforms"`
+}
+
+// HTTPCLIToolList is the object returned by the controller's HTTP list endpoint.
+type HTTPCLIToolList struct {
+	Items []HTTPCLIToolListItem `json:"items"`
+}
+
+// HTTPCLIToolInfo is the detailed CLITool object represented by the controller's HTTP info endpoint.
+type HTTPCLIToolInfo struct {
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	CLIToolSpec
+	CLIToolStatus
 }
 
 func init() {

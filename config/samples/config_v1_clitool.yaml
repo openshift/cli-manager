@@ -5,8 +5,9 @@ metadata:
   namespace: default
 spec:
   description: just a test
-  binaries:
-  - os: linux
-    arch: amd64
-    image: redhat/ubi8-micro:latest
-    path: /usr/bin/bash
+  versions:
+  - version: v4.4.20
+    binaries:
+    - platform: linux/amd64
+      image: redhat/ubi8-micro:latest
+      path: /usr/bin/bash

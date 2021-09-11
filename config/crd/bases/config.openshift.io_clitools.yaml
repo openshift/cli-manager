@@ -19,7 +19,7 @@ spec:
   - name: v1
     schema:
       openAPIV3Schema:
-        description: CLITool is the Schema for the clitools API
+        description: CLITool is the Schema for the clitools API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -34,41 +34,84 @@ spec:
           metadata:
             type: object
           spec:
-            description: CLIToolSpec defines the desired state of CLITool
+            description: CLIToolSpec defines the desired state of CLITool.
             properties:
-              binaries:
-                description: Binaries for the CLI tool
+              description:
+                description: Description of the CLI tool.
+                type: string
+              versions:
+                description: Versions of the CLI tool.
                 items:
-                  description: CLIToolBinary defines per-OS and per-Arch binaries
-                    for the given tool.
+                  description: CLIToolVersion defines a version number for the tool.
                   properties:
-                    arch:
-                      description: Architecture is the CPU architecture for given
-                        binary (i.e. amd64, arm64)
-                      type: string
-                    image:
-                      description: Image containing CLI tool
-                      type: string
-                    imagePullSecret:
-                      description: ImagePullSecret to use when connecting to an image
-                        registry that requires authentication
-                      type: string
-                    os:
-                      description: OS is the operating system for the given binary
-                        (i.e. linux, darwin, windows)
-                      type: string
-                    path:
-                      description: Path is the location within the image where the
-                        CLI tool can be found
+                    binaries:
+                      description: Binaries is a list of binaries for the given version.
+                      items:
+                        description: CLIToolBinary defines per-OS and per-Arch binaries
+                          for the given tool.
+                        properties:
+                          image:
+                            description: Image containing CLI tool.
+                            type: string
+                          imagePullSecret:
+                            description: ImagePullSecret to use when connecting to
+                              an image registry that requires authentication.
+                            type: string
+                          path:
+                            description: Path is the location within the image where
+                              the CLI tool can be found.
+                            type: string
+                          platform:
+                            description: Platform for the given binary (i.e. linux/amd64,
+                              darwin/amd64, windows/amd64).
+                            type: string
+                        type: object
+                      type: array
+                    version:
+                      description: Version is the name or number of the version.
                       type: string
                   type: object
                 type: array
-              description:
-                description: Description of the CLI tool
-                type: string
             type: object
           status:
             description: CLIToolStatus defines the observed state of CLITool
+            properties:
+              hashes:
+                description: Digests is a list of calculated hashes for a tool's version/platform
+                  combination.
+                items:
+                  description: CLIToolStatusDigest provides information about a hash
+                    for a tool's version/platform binary combination.
+                  properties:
+                    calculated:
+                      description: Calculated is when the hash was calculated.
+                      properties:
+                        nanos:
+                          description: Non-negative fractions of a second at nanosecond
+                            resolution. Negative second values with fractions must
+                            still have non-negative nanos values that count forward
+                            in time. Must be from 0 to 999,999,999 inclusive. This
+                            field may be limited in precision depending on context.
+                          format: int32
+                          type: integer
+                        seconds:
+                          description: Represents seconds of UTC time since Unix epoch
+                            1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z
+                            to 9999-12-31T23:59:59Z inclusive.
+                          format: int64
+                          type: integer
+                      required:
+                      - nanos
+                      - seconds
+                      type: object
+                    name:
+                      description: Name is the version/platform for the hash.
+                      type: string
+                    value:
+                      description: Digest is the text representation of the hash.
+                      type: string
+                  type: object
+                type: array
             type: object
         type: object
     served: true
