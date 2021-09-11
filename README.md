@@ -109,3 +109,12 @@ GET /v1/tools/download/?namespace=default&name=bash&os=linux&arch=amd64
 
 #### Response
 A successful response will contain the raw binary of the tool for the requested operating system and architecture.
+
+## Limitations
+The current design does not allow for versioning. Potential improvements:
+* Add list of `versions` to `CLITool` and place the current `binaries` field under the new `versions` field
+* Combine `os` and `arch` into `platform`, which is simply `os/arch`. This would allow for easier binary matching
+* Managing locally installed versions is problematic, as we don't want to maintain a manifest of installed tools and versions
+  * This could be worked around by updating `CLITool` to include `status.hashes[version/platform]=binary-hash`
+  * The hash would be calculated by the controller the first time the tool is downloaded
+  * `oc` could then perform the same hash on installed tools to match the hash stored in `CLITool.status.hashes` to determine locally installed version
