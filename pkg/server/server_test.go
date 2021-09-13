@@ -321,4 +321,49 @@ var _ = Describe("tools", func() {
 		Expect(item.Digests[0].Calculated).NotTo(BeZero())
 		Expect(item.Digests[0].Digest).To(ContainSubstring("sha256:"))
 	})
+
+	It("should get info for CLITool from digest", func() {
+		By("getting a known digest first")
+		req := httptest.NewRequest("GET", "/v1/tools/info/?namespace=default&name=bash&version=v4.4.20", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		Expect(rec.Code).To(Equal(http.StatusOK))
+
+		item := &configv1.HTTPCLIToolInfo{}
+		err := json.NewDecoder(rec.Body).Decode(item)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(item.Digests).NotTo(BeEmpty())
+		Expect(item.Digests[0].Name).To(Equal("v4.4.20/linux/amd64"))
+		Expect(item.Digests[0].Calculated).NotTo(BeZero())
+		Expect(item.Digests[0].Digest).To(ContainSubstring("sha256:"))
+
+		By("using known digest to query for the tool")
+		digest := item.Digests[0].Digest
+		req = httptest.NewRequest("GET", "/v1/tools/info/?digest="+digest, nil)
+		rec = httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		Expect(rec.Code).To(Equal(http.StatusOK))
+
+		Expect(rec.Code).To(Equal(http.StatusOK))
+
+		item = &configv1.HTTPCLIToolInfo{}
+		err = json.NewDecoder(rec.Body).Decode(item)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(rec.Header().Get("Content-Type")).To(Equal("application/json"))
+		Expect(item.Namespace).To(Equal("default"))
+		Expect(item.Name).To(Equal("bash"))
+		Expect(item.Description).To(Equal("just a test"))
+		Expect(item.Versions).NotTo(BeEmpty())
+		Expect(item.Versions[0].Version).To(Equal("v4.4.20"))
+		Expect(item.Versions[0].Binaries).NotTo(BeEmpty())
+		Expect(item.Versions[0].Binaries[0].Platform).To(Equal("linux/amd64"))
+		Expect(item.Versions[0].Binaries[0].Image).To(Equal("redhat/ubi8-micro:latest"))
+		Expect(item.Versions[0].Binaries[0].Path).To(Equal("/usr/bin/bash"))
+		Expect(item.Digests).NotTo(BeEmpty())
+		Expect(item.Digests[0].Name).To(Equal("v4.4.20/linux/amd64"))
+		Expect(item.Digests[0].Calculated).NotTo(BeZero())
+		Expect(item.Digests[0].Digest).To(ContainSubstring("sha256:"))
+	})
 })

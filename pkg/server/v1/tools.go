@@ -104,6 +104,59 @@ func (v *V1) ToolInfo(namespace, name, version string) (*configv1.HTTPCLIToolInf
 	return out, nil
 }
 
+// ToolInfoFromDigest attempts to return information about a tool from the given digest.
+// If there are multiple tools with the same digest, only the first one found is returned.
+// Returns nil if nothing is found.
+func (v *V1) ToolInfoFromDigest(digest string) (*configv1.HTTPCLIToolInfo, error) {
+	// get list of CLITools
+	list := &configv1.CLIToolList{}
+	if err := v.cli.List(context.Background(), list); err != nil {
+		return nil, fmt.Errorf("obtaining list of tools from k8s API: %v", err)
+	}
+
+	// loop through items
+	for _, tool := range list.Items {
+		if tool.Status.Digests == nil || len(tool.Status.Digests) == 0 {
+			continue
+		}
+
+		// loop through digests
+		newDigests := []configv1.CLIToolStatusDigest{}
+		newVersions := []configv1.CLIToolVersion{}
+		for _, d := range tool.Status.Digests {
+			if d.Digest == digest {
+				fields := strings.SplitN(d.Name, "/", 2)
+				if len(fields) < 2 {
+					continue
+				}
+
+				// loop through versions to find which one applies to this digest
+				version := fields[0]
+				for _, v := range tool.Spec.Versions {
+					if v.Version == version {
+						newDigests = append(newDigests, d)
+						newVersions = append(newVersions, v)
+					}
+				}
+			}
+		}
+
+		if len(newVersions) > 0 {
+			tool.Spec.Versions = newVersions
+			tool.Status.Digests = newDigests
+
+			return &configv1.HTTPCLIToolInfo{
+				Namespace:     tool.Namespace,
+				Name:          tool.Name,
+				CLIToolSpec:   tool.Spec,
+				CLIToolStatus: tool.Status,
+			}, nil
+		}
+	}
+
+	return nil, nil
+}
+
 // DownloadTool downloads the given tool and writes it to the provided io.Writer.
 // If `version` is an empty string, the most recent version is used.
 // If `version` is not an empty string, the specified version is used.
@@ -284,6 +337,25 @@ func (v *V1) handleToolInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// handle digest query
+	digest := r.URL.Query().Get("digest")
+	if len(digest) > 0 {
+		out, err := v.ToolInfoFromDigest(digest)
+		if err != nil {
+			v.respondSystemError(w, 500, err, fmt.Sprintf("getting CLITool: digest: %s", digest))
+			return
+		}
+
+		if out == nil {
+			v.respondUserError(w, 404, fmt.Errorf("CLITool not found for given digest"))
+			return
+		}
+
+		v.respondJSON(w, out)
+		return
+	}
+
+	// handle namespace/name query
 	namespace := r.URL.Query().Get("namespace")
 	if len(namespace) == 0 {
 		v.respondUserError(w, 400, fmt.Errorf("missing namespace in query"))
