@@ -44,7 +44,7 @@ func (h *HTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	h.log.Info(
 		"request",
-		"status", wrapped.status,
+		"status", wrapped.StatusCode(),
 		"method", r.Method,
 		"path", r.URL.Path,
 		"size", wrapped.size,
@@ -96,4 +96,11 @@ func (r *responseWriter) WriteHeader(statusCode int) {
 func (r *responseWriter) Write(b []byte) (int, error) {
 	r.size += len(b)
 	return r.ResponseWriter.Write(b)
+}
+
+func (r *responseWriter) StatusCode() int {
+	if r.status == 0 {
+		r.status = http.StatusOK
+	}
+	return r.status
 }
