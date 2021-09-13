@@ -103,6 +103,7 @@ func main() {
 
 	go func() {
 		handler := server.NewHTTPHandler(mgr.GetClient(), mgr.GetLogger())
+		setupLog.Info("API server starting to listen", "addr", apiAddr)
 		if err := http.ListenAndServe(apiAddr, handler); err != nil {
 			setupLog.Error(err, "problem starting API")
 		}
