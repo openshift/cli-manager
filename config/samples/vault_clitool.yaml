@@ -1,0 +1,13 @@
+apiVersion: config.openshift.io/v1
+kind: CLITool
+metadata:
+  name: vault
+  namespace: default
+spec:
+  description: HashiCorp Vault
+  versions:
+  - version: 1.8.2
+    binaries:
+    - platform: linux/amd64
+      image: vault:1.8.2
+      path: /bin/vault
