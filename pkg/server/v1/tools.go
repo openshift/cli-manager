@@ -2,17 +2,30 @@ package v1
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
 	configv1 "github.com/deejross/openshift-cli-manager/api/v1"
 	"github.com/deejross/openshift-cli-manager/pkg/image"
+	"sigs.k8s.io/yaml"
+
+	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing/protocol/packp"
+	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/server"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -433,4 +446,214 @@ func (v *V1) handleDownloadTool(w http.ResponseWriter, r *http.Request) {
 		v.respondSystemError(w, 500, err, fmt.Sprintf("getting CLITool: name: %s/%s, platform: %s", namespace, name, platform))
 		return
 	}
+}
+
+func (v *V1) handleGitRequests(w http.ResponseWriter, r *http.Request) {
+	paths := strings.SplitN(strings.TrimPrefix(r.URL.String(), "/v1/"), "/", 2)
+
+	if len(paths) < 2 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	repo := paths[0]
+	path := strings.TrimSuffix(paths[1], "/")
+
+	switch path {
+	case "info/refs?service=git-upload-pack":
+		v.handleGitUploadPackAdvertisement(repo, path, w, r)
+	case "git-upload-pack":
+		v.handleGitUploadPackResult(repo, path, w, r)
+	default:
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+
+func (v *V1) handleGitUploadPackAdvertisement(repoName, path string, w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	dir, _, tree, err := v.buildGitRepo(repoName)
+	if err != nil {
+		v.log.Error(err, "buildGitRepo")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer os.RemoveAll(dir)
+
+	endpoint, err := transport.NewEndpoint(".git")
+	if err != nil {
+		http.Error(w, fmt.Sprintf("endpoint failure: %s", err), http.StatusBadRequest)
+		return
+	}
+
+	loader := server.NewFilesystemLoader(tree.Filesystem)
+	srv := server.NewServer(loader)
+	session, err := srv.NewUploadPackSession(endpoint, nil)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("starting session: %s", err), http.StatusInternalServerError)
+		return
+	}
+
+	ar, err := session.AdvertisedReferences()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("getting advertised references: %s", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Content-Type", "application/x-git-upload-pack-advertisement")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("001e# service=git-upload-pack\n0000"))
+
+	if err := ar.Encode(w); err != nil {
+		http.Error(w, fmt.Sprintf("encoding server response: %s", err), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (v *V1) handleGitUploadPackResult(repoName, path string, w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	dir, _, tree, err := v.buildGitRepo(repoName)
+	if err != nil {
+		v.log.Error(err, "buildGitRepo")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer os.RemoveAll(dir)
+
+	endpoint, err := transport.NewEndpoint(".git")
+	if err != nil {
+		http.Error(w, fmt.Sprintf("endpoint failure: %s", err), http.StatusBadRequest)
+		return
+	}
+
+	loader := server.NewFilesystemLoader(tree.Filesystem)
+	srv := server.NewServer(loader)
+	session, err := srv.NewUploadPackSession(endpoint, nil)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("starting session: %s", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Content-Type", "application/x-git-upload-pack-result")
+	w.WriteHeader(http.StatusOK)
+
+	body := r.Body
+	if r.Header.Get("Content-Encoding") == "gzip" {
+		var err error
+		body, err = gzip.NewReader(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	req := packp.NewUploadPackRequest()
+	if err := req.Decode(body); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var resp *packp.UploadPackResponse
+	resp, err = session.UploadPack(context.TODO(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := resp.Encode(w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (v *V1) buildGitRepo(repoName string) (string, *git.Repository, *git.Worktree, error) {
+	// TODO: temp list of tools, replace with actual CLITools
+	tools := &configv1.CLIToolList{
+		Items: []configv1.CLITool{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bash",
+					Namespace: "default",
+				},
+				Spec: configv1.CLIToolSpec{
+					Description: "just a test",
+					Versions: []configv1.CLIToolVersion{
+						{
+							Version: "v4.4.20",
+							Binaries: []configv1.CLIToolVersionBinary{
+								{
+									Platform: "linux/amd64",
+									Image:    "redhat/ubi8-micro:latest",
+									Path:     "/usr/bin/bash",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	dir, err := ioutil.TempDir("", "init")
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("unable to create temporary directory: %w", err)
+	}
+
+	repo, err := git.PlainInit(dir, false)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("could not init repo: %w", err)
+	}
+
+	tree, err := repo.Worktree()
+	if err != nil {
+		return "", nil, nil, err
+	}
+
+	for _, tool := range tools.Items {
+		name := filepath.Join(dir, fmt.Sprintf("%s-%s.yaml", tool.ObjectMeta.Namespace, tool.ObjectMeta.Name))
+		f, err := os.OpenFile(name, os.O_CREATE|os.O_RDWR, 0644)
+		if err != nil {
+			return "", nil, nil, err
+		}
+
+		y, err := yaml.Marshal(tool)
+		if err != nil {
+			f.Close()
+			return "", nil, nil, err
+		}
+
+		f.Write(y)
+		f.Close()
+	}
+
+	if err := tree.AddGlob("."); err != nil {
+		return "", nil, nil, err
+	}
+
+	if _, err := tree.Commit("initial commit", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "OpenShift CLI Manager",
+			Email: "info@redhat.com",
+			When:  time.Now(),
+		},
+	}); err != nil {
+		return "", nil, nil, err
+	}
+
+	if err := repo.CreateBranch(&config.Branch{
+		Name: string(plumbing.Master),
+	}); err != nil {
+		return "", nil, nil, fmt.Errorf("could not create %s branch: %w", plumbing.Master, err)
+	}
+
+	return dir, repo, tree, nil
 }
