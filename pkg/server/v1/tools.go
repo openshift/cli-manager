@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -63,11 +64,14 @@ func (v *V1) ListTools(platform string) (*configv1.HTTPCLIToolList, error) {
 		}
 
 		outItem := configv1.HTTPCLIToolListItem{
-			Namespace:     item.Namespace,
-			Name:          item.Name,
-			Description:   item.Spec.Description,
-			LatestVersion: version.Version,
-			Platforms:     platforms,
+			Namespace:        item.Namespace,
+			Name:             item.Name,
+			ShortDescription: item.Spec.ShortDescription,
+			Description:      item.Spec.Description,
+			Caveats:          item.Spec.Caveats,
+			Homepage:         item.Spec.Homepage,
+			LatestVersion:    version.Version,
+			Platforms:        platforms,
 		}
 
 		if len(platform) > 0 {
@@ -431,13 +435,37 @@ func (v *V1) handleDownloadTool(w http.ResponseWriter, r *http.Request) {
 		filename += ".exe"
 	}
 
+	// set the requested output format
+	format := r.URL.Query().Get("format")
+	var writer io.Writer
+
+	switch format {
+	case "", "raw":
+		writer = w
+	case "zip":
+		filename += "." + format
+
+		z := zip.NewWriter(w)
+		defer z.Close()
+
+		var err error
+		writer, err = z.Create(name)
+		if err != nil {
+			v.respondSystemError(w, 500, err, "generating zip")
+			return
+		}
+	default:
+		v.respondUserError(w, 400, fmt.Errorf("unknown format: %s", format))
+		return
+	}
+
 	// set the appropriate response headers for downloading a binary
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", "attachment; filename="+filename)
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 
 	// get the requested CLITool resources
-	err := v.DownloadTool(namespace, name, platform, version, w)
+	err := v.DownloadTool(namespace, name, platform, version, writer)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			v.respondUserError(w, 404, err)
@@ -575,6 +603,7 @@ func (v *V1) handleGitUploadPackResult(repoName, path string, w http.ResponseWri
 	}
 }
 
+// buildGitRepo builds a git repo from the list of configured tools.
 func (v *V1) buildGitRepo(repoName string) (string, *git.Repository, *git.Worktree, error) {
 	// TODO: temp list of tools, replace with actual CLITools
 	tools := &configv1.CLIToolList{
@@ -625,7 +654,7 @@ func (v *V1) buildGitRepo(repoName string) (string, *git.Repository, *git.Worktr
 			return "", nil, nil, err
 		}
 
-		y, err := yaml.Marshal(tool)
+		y, err := toolToKrewPlugin(tool)
 		if err != nil {
 			f.Close()
 			return "", nil, nil, err
@@ -656,4 +685,61 @@ func (v *V1) buildGitRepo(repoName string) (string, *git.Repository, *git.Worktr
 	}
 
 	return dir, repo, tree, nil
+}
+
+// toolToKrewPlugin converts a tool to a Krew plugin.
+func toolToKrewPlugin(tool configv1.CLITool) ([]byte, error) {
+	if len(tool.Spec.Versions) == 0 {
+		return nil, fmt.Errorf("tool does not have any versions")
+	}
+
+	version := tool.Spec.Versions[len(tool.Spec.Versions)-1]
+	platforms := []Platform{}
+
+	for _, bin := range version.Binaries {
+		fields := strings.SplitN(bin.Platform, "/", 2)
+		if len(fields) < 2 {
+			continue
+		}
+
+		p := Platform{
+			URI:    "https://something.here.zip",
+			Sha256: "need this one",
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"os":   fields[0],
+					"arch": fields[1],
+				},
+			},
+			Files: []FileOperation{
+				{
+					From: tool.Name,
+					To:   ".",
+				},
+			},
+			Bin: tool.Name,
+		}
+
+		platforms = append(platforms, p)
+	}
+
+	plugin := Plugin{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "krew.googlecontainertools.github.com/v1alpha2",
+			Kind:       "Plugin",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: tool.Name,
+		},
+		Spec: PluginSpec{
+			Version:          version.Version,
+			ShortDescription: tool.Spec.ShortDescription,
+			Description:      tool.Spec.Description,
+			Caveats:          tool.Spec.Caveats,
+			Homepage:         tool.Spec.Homepage,
+			Platforms:        platforms,
+		},
+	}
+
+	return yaml.Marshal(plugin)
 }

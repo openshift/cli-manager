@@ -25,9 +25,21 @@ import (
 
 // CLIToolSpec defines the desired state of CLITool.
 type CLIToolSpec struct {
+	// ShortDescription of the CLI tool.
+	// +optional
+	ShortDescription string `json:"shortDescription,omitempty"`
+
 	// Description of the CLI tool.
 	// +optional
 	Description string `json:"description,omitempty"`
+
+	// Caveats of using the CLI tool.
+	// +optional
+	Caveats string `json:"caveats,omitempty"`
+
+	// Homepage of the CLI tool.
+	// +optional
+	Homepage string `json:"homepage,omitempty"`
 
 	// Versions of the CLI tool.
 	// +required
@@ -105,11 +117,14 @@ type CLIToolList struct {
 
 // HTTPCLIToolListItem is the CLITool object represented by the controller's HTTP list endpoint.
 type HTTPCLIToolListItem struct {
-	Namespace     string   `json:"namespace"`
-	Name          string   `json:"name"`
-	Description   string   `json:"description"`
-	LatestVersion string   `json:"latestVersion"`
-	Platforms     []string `json:"platforms"`
+	Namespace        string   `json:"namespace"`
+	Name             string   `json:"name"`
+	ShortDescription string   `json:"shortDescription"`
+	Description      string   `json:"description"`
+	Caveats          string   `json:"caveats"`
+	Homepage         string   `json:"homepage"`
+	LatestVersion    string   `json:"latestVersion"`
+	Platforms        []string `json:"platforms"`
 }
 
 // HTTPCLIToolList is the object returned by the controller's HTTP list endpoint.

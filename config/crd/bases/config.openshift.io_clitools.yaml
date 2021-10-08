@@ -36,8 +36,17 @@ spec:
           spec:
             description: CLIToolSpec defines the desired state of CLITool.
             properties:
+              caveats:
+                description: Caveats of using the CLI tool.
+                type: string
               description:
                 description: Description of the CLI tool.
+                type: string
+              homepage:
+                description: Homepage of the CLI tool.
+                type: string
+              shortDescription:
+                description: ShortDescription of the CLI tool.
                 type: string
               versions:
                 description: Versions of the CLI tool.
