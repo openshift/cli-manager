@@ -92,7 +92,6 @@ func (v *V1) ListTools(platform string) (*configv1.HTTPCLIToolList, error) {
 
 // ToolInfo returns information about a tool.
 // If `version` is an empty string, returns all known versions.
-// If `version` is `latest`, returns the most recent known version.
 // If `version` is a non-empty string, returns only information about the given version.
 func (v *V1) ToolInfo(namespace, name, version string) (*configv1.HTTPCLIToolInfo, error) {
 	// get the requested CLITool resources
@@ -112,13 +111,24 @@ func (v *V1) ToolInfo(namespace, name, version string) (*configv1.HTTPCLIToolInf
 		versions := out.Versions
 		out.Versions = []configv1.CLIToolVersion{}
 		for i, v := range versions {
-			if v.Version == version || (version == "latest" && i == len(versions)-1) {
+			if v.Version == version || i == len(versions)-1 {
 				out.Versions = append(out.Versions, v)
 			}
 		}
 	}
 
 	return out, nil
+}
+
+// ToolDigest returns the digest of a tool's version and platform.
+// If `version` is empty the most recent known version is used.
+func (v *V1) ToolDigest(namespace, name, platform, version string) (string, error) {
+	reader, err := v.GetBinaryFromImage(namespace, name, platform, version)
+	if err != nil {
+		return "", err
+	}
+
+	return v.CalculateDigest(reader)
 }
 
 // ToolInfoFromDigest attempts to return information about a tool from the given digest.
@@ -175,17 +185,28 @@ func (v *V1) ToolInfoFromDigest(digest string) (*configv1.HTTPCLIToolInfo, error
 }
 
 // DownloadTool downloads the given tool and writes it to the provided io.Writer.
-// If `version` is an empty string, the most recent version is used.
-// If `version` is not an empty string, the specified version is used.
+// If `version` is empty, the most recent version is used.
 func (v *V1) DownloadTool(namespace, name, platform, version string, w io.Writer) error {
+	reader, err := v.GetBinaryFromImage(namespace, name, platform, version)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(w, reader)
+	return err
+}
+
+// GetBinaryFromImage gets the binary from the named tool's platform and version.
+// If `version` is empty, the most recent version is used.
+func (v *V1) GetBinaryFromImage(namespace, name, platform, version string) (io.Reader, error) {
 	tool := &configv1.CLITool{}
 	if err := v.cli.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: name}, tool); err != nil {
-		return err
+		return nil, err
 	}
 
 	// make sure CLITool has versions
 	if tool.Spec.Versions == nil || len(tool.Spec.Versions) == 0 {
-		return fmt.Errorf("misconfigured CLITool: name: %s/%s, error: there are no versions specified for the given CLITool", namespace, name)
+		return nil, fmt.Errorf("misconfigured CLITool: name: %s/%s, error: there are no versions specified for the given CLITool", namespace, name)
 	}
 
 	// use latest version if not specified
@@ -203,7 +224,7 @@ func (v *V1) DownloadTool(namespace, name, platform, version string, w io.Writer
 
 	// make sure there are binaries within the CLITool resource
 	if len(binaries) == 0 {
-		return fmt.Errorf("misconfigured CLITool: name: %s/%s, error: there are no binaries specified for the given CLITool version: %s", namespace, name, version)
+		return nil, fmt.Errorf("misconfigured CLITool: name: %s/%s, error: there are no binaries specified for the given CLITool version: %s", namespace, name, version)
 	}
 
 	// find the correct binary for the given operating system and architecture combination
@@ -218,7 +239,7 @@ func (v *V1) DownloadTool(namespace, name, platform, version string, w io.Writer
 	// return an error if there is no binary for the given operating system and architecture combination
 	if binary == nil {
 		// we return this type of error instead of using `fmt.Errorf` so that `errors.IsNotFound(err)` will return true, and allow an HTTP handler to return a 404 status code
-		return &errors.StatusError{
+		return nil, &errors.StatusError{
 			ErrStatus: metav1.Status{
 				Status:  metav1.StatusFailure,
 				Code:    http.StatusNotFound,
@@ -235,12 +256,12 @@ func (v *V1) DownloadTool(namespace, name, platform, version string, w io.Writer
 		// if an imagePullSecret is defined for the binary, retrieve the Secret for it
 		imagePullSecret := &corev1.Secret{}
 		if err := v.cli.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: binary.ImagePullSecret}, imagePullSecret); err != nil {
-			return fmt.Errorf("misconfigured CLITool: name: %s/%s, version: %s, platform: %s, error while getting imagePullSecret %s: %v", namespace, name, version, platform, binary.ImagePullSecret, err)
+			return nil, fmt.Errorf("misconfigured CLITool: name: %s/%s, version: %s, platform: %s, error while getting imagePullSecret %s: %v", namespace, name, version, platform, binary.ImagePullSecret, err)
 		}
 
 		// ensure the Secret is of the expected type
 		if imagePullSecret.Type != corev1.SecretTypeDockercfg {
-			return fmt.Errorf("misconfigured CLITool: name: %s/%s, version: %s, platform: %s, error: configured imagePullSecret %s for given version and platform combination is not of type: %s", namespace, name, version, platform, binary.ImagePullSecret, corev1.SecretTypeDockercfg)
+			return nil, fmt.Errorf("misconfigured CLITool: name: %s/%s, version: %s, platform: %s, error: configured imagePullSecret %s for given version and platform combination is not of type: %s", namespace, name, version, platform, binary.ImagePullSecret, corev1.SecretTypeDockercfg)
 		}
 
 		// set the .dockercfg auth information for the image puller
@@ -250,7 +271,7 @@ func (v *V1) DownloadTool(namespace, name, platform, version string, w io.Writer
 	// attempt to pull the image down locally
 	img, err := image.Pull(binary.Image, pullOptions)
 	if err != nil {
-		return fmt.Errorf("could not pull image: name: %s, error: %v for CLITool: name: %s/%s, version: %s, platform: %s", binary.Image, err, namespace, name, version, platform)
+		return nil, fmt.Errorf("could not pull image: name: %s, error: %v for CLITool: name: %s/%s, version: %s, platform: %s", binary.Image, err, namespace, name, version, platform)
 	}
 
 	// check to see if a digest has been calculated for this binary
@@ -263,12 +284,15 @@ func (v *V1) DownloadTool(namespace, name, platform, version string, w io.Writer
 		}
 	}
 
-	// if a digest has not been caluculated yet, setup a TeeReader for hashing once the extract is finished
+	// create a buffer for the binary contents
+	toolBuf := &bytes.Buffer{}
+
+	// if a digest has not been calculated yet, setup a TeeReader for hashing once the extract is finished
 	var digestReader io.Reader
 	if digestCalculated == 0 {
 		buf := &bytes.Buffer{}
-		digestReader = io.TeeReader(buf, w)
-		w = buf
+		digestReader = io.TeeReader(buf, toolBuf)
+		toolBuf = buf
 	}
 
 	// configure the extractor based on the binary information, setting the output destination to the response body
@@ -276,21 +300,21 @@ func (v *V1) DownloadTool(namespace, name, platform, version string, w io.Writer
 		Targets: []image.Target{
 			{
 				Source:      binary.Path,
-				Destination: w,
+				Destination: toolBuf,
 			},
 		},
 	}
 
 	// attempt to extract and write the raw binary to the body of the response
 	if err := image.Extract(img, extractOptions); err != nil {
-		return fmt.Errorf("unable to extract tool from image: name: %s/%s, version: %s, platform: %s, image: %s, path: %s, error: %v", namespace, name, version, binary.Platform, binary.Image, binary.Path, err)
+		return nil, fmt.Errorf("unable to extract tool from image: name: %s/%s, version: %s, platform: %s, image: %s, path: %s, error: %v", namespace, name, version, binary.Platform, binary.Image, binary.Path, err)
 	}
 
 	// if digestReader was created, then we need to calculate the digest and update the CLITool's status
 	if digestReader != nil {
 		digest, err := v.CalculateDigest(digestReader)
 		if err != nil {
-			return fmt.Errorf("unable to calculate digest for binary: name: %s/%s, version: %s, platform: %s, image: %s, path: %s, error: %v", namespace, name, version, binary.Platform, binary.Image, binary.Path, err)
+			return nil, fmt.Errorf("unable to calculate digest for binary: name: %s/%s, version: %s, platform: %s, image: %s, path: %s, error: %v", namespace, name, version, binary.Platform, binary.Image, binary.Path, err)
 		}
 
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -316,9 +340,10 @@ func (v *V1) DownloadTool(namespace, name, platform, version string, w io.Writer
 		}
 	}
 
-	return nil
+	return toolBuf, nil
 }
 
+// CalculateDigest calculates the SHA256 digest of the given stream.
 func (v *V1) CalculateDigest(r io.Reader) (string, error) {
 	hash := sha256.New()
 	if _, err := io.Copy(hash, r); err != nil {
@@ -503,7 +528,7 @@ func (v *V1) handleGitUploadPackAdvertisement(repoName, path string, w http.Resp
 		return
 	}
 
-	dir, _, tree, err := v.buildGitRepo(repoName)
+	dir, _, tree, err := v.buildGitRepo(repoName, r)
 	if err != nil {
 		v.log.Error(err, "buildGitRepo")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -548,7 +573,7 @@ func (v *V1) handleGitUploadPackResult(repoName, path string, w http.ResponseWri
 		return
 	}
 
-	dir, _, tree, err := v.buildGitRepo(repoName)
+	dir, _, tree, err := v.buildGitRepo(repoName, r)
 	if err != nil {
 		v.log.Error(err, "buildGitRepo")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -604,7 +629,7 @@ func (v *V1) handleGitUploadPackResult(repoName, path string, w http.ResponseWri
 }
 
 // buildGitRepo builds a git repo from the list of configured tools.
-func (v *V1) buildGitRepo(repoName string) (string, *git.Repository, *git.Worktree, error) {
+func (v *V1) buildGitRepo(repoName string, r *http.Request) (string, *git.Repository, *git.Worktree, error) {
 	// TODO: temp list of tools, replace with actual CLITools
 	tools := &configv1.CLIToolList{
 		Items: []configv1.CLITool{
@@ -654,7 +679,7 @@ func (v *V1) buildGitRepo(repoName string) (string, *git.Repository, *git.Worktr
 			return "", nil, nil, err
 		}
 
-		y, err := toolToKrewPlugin(tool)
+		y, err := v.toolToKrewPlugin(tool, r)
 		if err != nil {
 			f.Close()
 			return "", nil, nil, err
@@ -688,7 +713,7 @@ func (v *V1) buildGitRepo(repoName string) (string, *git.Repository, *git.Worktr
 }
 
 // toolToKrewPlugin converts a tool to a Krew plugin.
-func toolToKrewPlugin(tool configv1.CLITool) ([]byte, error) {
+func (v *V1) toolToKrewPlugin(tool configv1.CLITool, r *http.Request) ([]byte, error) {
 	if len(tool.Spec.Versions) == 0 {
 		return nil, fmt.Errorf("tool does not have any versions")
 	}
@@ -702,9 +727,16 @@ func toolToKrewPlugin(tool configv1.CLITool) ([]byte, error) {
 			continue
 		}
 
+		digest, err := v.ToolDigest(tool.Namespace, tool.Name, bin.Platform, version.Version)
+		if err != nil {
+			return nil, err
+		}
+
+		url := hostFromRequest(r) + fmt.Sprintf("/v1/tools/download/?namespace=%s&name=%s&platform=%s&version=%s&format=zip", tool.Namespace, tool.Name, bin.Platform, version.Version)
+
 		p := Platform{
-			URI:    "https://something.here.zip",
-			Sha256: "need this one",
+			URI:    url,
+			Sha256: strings.TrimPrefix(digest, "sha256:"),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"os":   fields[0],
@@ -742,4 +774,22 @@ func toolToKrewPlugin(tool configv1.CLITool) ([]byte, error) {
 	}
 
 	return yaml.Marshal(plugin)
+}
+
+func hostFromRequest(r *http.Request) string {
+	if len(r.URL.Scheme) > 0 && len(r.URL.Host) > 0 {
+		return r.URL.Scheme + "://" + r.URL.Host
+	}
+
+	proto := "https"
+	if p := r.Header.Get("X-Forwarded-Proto"); len(p) > 0 {
+		proto = p
+	}
+
+	host := "api-openshift-cli-manager.svc.local"
+	if h := r.Header.Get("Host"); len(h) > 0 {
+		host = h
+	}
+
+	return proto + "://" + host
 }
