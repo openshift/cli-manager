@@ -9,7 +9,7 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
-  - plugin
+  - plugins
   verbs:
   - create
   - delete
@@ -21,13 +21,13 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
-  - plugin/finalizers
+  - plugins/finalizers
   verbs:
   - update
 - apiGroups:
   - config.openshift.io
   resources:
-  - plugin/status
+  - plugins/status
   verbs:
   - get
   - patch

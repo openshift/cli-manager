@@ -1,0 +1,15 @@
+apiVersion: config.openshift.io/v1
+kind: Plugin
+metadata:
+  name: vault
+  namespace: default
+spec:
+  shortDescription: HashiCorp Vault
+  version: 1.8.2
+  platforms:
+  - platform: linux/amd64
+    image: vault:1.8.2
+    files:
+    - from: /bin/vault
+      to: "."
+    bin: vault

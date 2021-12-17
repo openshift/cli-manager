@@ -1,0 +1,15 @@
+apiVersion: config.openshift.io/v1
+kind: Plugin
+metadata:
+  name: bash
+  namespace: default
+spec:
+  shortDescription: just a test
+  version: v4.4.20
+  platforms:
+  - platform: linux/amd64
+    image: redhat/ubi8-micro:latest
+    files:
+    - from: /usr/bin/bash
+      to: "."
+    bin: bash

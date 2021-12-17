@@ -93,16 +93,16 @@ Example:
 ```
 
 ### `GET /v1/plugins/info/`
-Get binary information about a given tool.
+Get binary information about a given plugin.
 
 #### Request
 The following query parameters are required:
-* `namespace`: Namespace of the CLITool resource
-* `name`: Name of the CLITool resource
+* `namespace`: Namespace of the Plugin resource
+* `name`: Name of the Plugin resource
 
 Example:
 ```http
-GET /v1/tools/info/?namespace=default&name=bash
+GET /v1/plugins/info/?namespace=default&name=bash
 ```
 
 #### Response
@@ -136,8 +136,8 @@ Download a plugin as a tar.gz archive.
 
 #### Request
 The following query parameters are required:
-* `namespace`: Namespace for the CLITool resource
-* `name`: Name of the CLITool resource
+* `namespace`: Namespace for the Plugin resource
+* `name`: Name of the Plugin resource
 * `platform`: Platform for the binary
 
 Example:

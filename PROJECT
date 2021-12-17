@@ -10,7 +10,7 @@ resources:
   controller: true
   domain: openshift.io
   group: config
-  kind: CLITool
+  kind: Plugin
   path: github.com/deejross/openshift-cli-manager/api/v1
   version: v1
 version: "3"

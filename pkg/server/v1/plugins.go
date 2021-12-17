@@ -96,19 +96,19 @@ func (v *V1) DownloadPlugin(namespace, name, platform string, w io.Writer) error
 // GetBinariesFromImage gets the binaries from the named plugin's platform.
 // The returned `io.Reader` is a tar.gz archive of the binaries.
 func (v *V1) GetBinariesFromImage(namespace, name, platform string) (io.Reader, error) {
-	tool := &configv1.Plugin{}
-	if err := v.cli.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: name}, tool); err != nil {
+	plugin := &configv1.Plugin{}
+	if err := v.cli.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: name}, plugin); err != nil {
 		return nil, err
 	}
 
 	// make sure Plugin has platforms
-	if len(tool.Spec.Platforms) == 0 {
+	if len(plugin.Spec.Platforms) == 0 {
 		return nil, fmt.Errorf("misconfigured Plugin: name: %s/%s, error: there are no platforms specified for the given Plugin", namespace, name)
 	}
 
 	// get binaries list for given platform
 	var pluginPlatform *configv1.PluginPlatform
-	for _, plat := range tool.Spec.Platforms {
+	for _, plat := range plugin.Spec.Platforms {
 		if plat.Platform == platform {
 			pluginPlatform = &plat
 			break

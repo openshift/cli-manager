@@ -79,11 +79,11 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cli).NotTo(BeNil())
 
-	log = ctrl.Log.WithName("tools_test")
+	log = ctrl.Log.WithName("plugins_test")
 	handler = NewHTTPHandler(cli, log)
 
 	// load some test resources
-	tool := &configv1.Plugin{
+	plugin := &configv1.Plugin{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bash",
 			Namespace: "default",
@@ -107,7 +107,7 @@ var _ = BeforeSuite(func() {
 		},
 	}
 
-	err = cli.Create(context.Background(), tool)
+	err = cli.Create(context.Background(), plugin)
 	Expect(err).NotTo(HaveOccurred())
 }, 60)
 

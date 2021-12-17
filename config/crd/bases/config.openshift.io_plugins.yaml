@@ -56,14 +56,7 @@ spec:
                         The path is relative to the root of the installation folder.
                         The binary will be linked after all FileOperations are executed.
                       type: string
-                    image:
-                      description: Image containing CLI tool.
-                      type: string
-                    imagePullSecret:
-                      description: ImagePullSecret to use when connecting to an image
-                        registry that requires authentication.
-                      type: string
-                    path:
+                    files:
                       description: Files is a list of file locations within the image
                         that need to be extracted.
                       items:
@@ -79,20 +72,39 @@ spec:
                             description: To is the relative path within the root of
                               the installation folder to place the file.
                             type: string
+                        required:
+                        - from
+                        - to
                         type: object
                       type: array
+                    image:
+                      description: Image containing plugin.
+                      type: string
+                    imagePullSecret:
+                      description: ImagePullSecret to use when connecting to an image
+                        registry that requires authentication.
+                      type: string
                     platform:
                       description: Platform for the given binary (i.e. linux/amd64,
                         darwin/amd64, windows/amd64).
                       type: string
+                  required:
+                  - bin
+                  - files
+                  - image
+                  - platform
                   type: object
                 type: array
               shortDescription:
                 description: ShortDescription of the plugin.
                 type: string
-              versions:
+              version:
                 description: Version of the plugin.
                 type: string
+            required:
+            - platforms
+            - shortDescription
+            - version
             type: object
           status:
             description: PluginStatus defines the observed state of Plugin.
