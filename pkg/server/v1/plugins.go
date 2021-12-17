@@ -427,7 +427,7 @@ func (v *V1) buildGitRepo(repoName string, r *http.Request) (string, *git.Reposi
 			return "", nil, nil, err
 		}
 
-		y, err := v.toolToKrewPlugin(plugin, r)
+		y, err := v.pluginToKrewPlugin(plugin, r)
 		if err != nil {
 			f.Close()
 			return "", nil, nil, err
@@ -460,8 +460,8 @@ func (v *V1) buildGitRepo(repoName string, r *http.Request) (string, *git.Reposi
 	return dir, repo, tree, nil
 }
 
-// toolToKrewPlugin converts a tool to a Krew plugin.
-func (v *V1) toolToKrewPlugin(plugin configv1.Plugin, r *http.Request) ([]byte, error) {
+// pluginToKrewPlugin converts a Plugin to a Krew plugin.
+func (v *V1) pluginToKrewPlugin(plugin configv1.Plugin, r *http.Request) ([]byte, error) {
 	if len(plugin.Spec.Platforms) == 0 {
 		return nil, fmt.Errorf("plugin does not have any platforms")
 	}
