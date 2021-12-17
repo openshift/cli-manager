@@ -83,11 +83,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.CLIToolReconciler{
+	if err = (&controllers.PluginReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "CLITool")
+		setupLog.Error(err, "unable to create controller", "controller", "Plugin")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

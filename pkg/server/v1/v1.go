@@ -27,9 +27,9 @@ func (v *V1) RegisterRoutes(mux *http.ServeMux) {
 		v.respondJSON(w, map[string]string{"name": "openshift-cli-manager"})
 	})
 
-	mux.HandleFunc("/v1/tools/", v.handleListTools)
-	mux.HandleFunc("/v1/tools/info/", v.handleToolInfo)
-	mux.HandleFunc("/v1/tools/download/", v.handleDownloadTool)
+	mux.HandleFunc("/v1/plugins/", v.handleListPlugins)
+	mux.HandleFunc("/v1/plugins/info/", v.handlePluginInfo)
+	mux.HandleFunc("/v1/plugins/download/", v.handleDownloadPlugin)
 	mux.HandleFunc("/v1/", v.handleGitRequests)
 }
 

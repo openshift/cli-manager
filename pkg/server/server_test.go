@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -82,21 +83,23 @@ var _ = BeforeSuite(func() {
 	handler = NewHTTPHandler(cli, log)
 
 	// load some test resources
-	tool := &configv1.CLITool{
+	tool := &configv1.Plugin{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bash",
 			Namespace: "default",
 		},
-		Spec: configv1.CLIToolSpec{
-			Description: "just a test",
-			Versions: []configv1.CLIToolVersion{
+		Spec: configv1.PluginSpec{
+			ShortDescription: "just a test",
+			Version:          "v4.4.20",
+			Platforms: []configv1.PluginPlatform{
 				{
-					Version: "v4.4.20",
-					Binaries: []configv1.CLIToolVersionBinary{
+					Platform: "linux/amd64",
+					Image:    "redhat/ubi8-micro:latest",
+					Bin:      "bash",
+					Files: []configv1.FileOperation{
 						{
-							Platform: "linux/amd64",
-							Image:    "redhat/ubi8-micro:latest",
-							Path:     "/usr/bin/bash",
+							From: "/usr/bin/bash",
+							To:   ".",
 						},
 					},
 				},
@@ -142,61 +145,63 @@ var _ = Describe("v1", func() {
 	})
 })
 
-var _ = Describe("tools", func() {
+var _ = Describe("plugins", func() {
 	It("should reject unsupported methods", func() {
-		req := httptest.NewRequest("POST", "/v1/tools/", nil)
+		req := httptest.NewRequest("POST", "/v1/plugins/", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
 		Expect(rec.Code).To(Equal(http.StatusMethodNotAllowed))
 	})
 
-	It("should list CLITools", func() {
-		req := httptest.NewRequest("GET", "/v1/tools/", nil)
+	It("should list Plugins", func() {
+		req := httptest.NewRequest("GET", "/v1/plugins/", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
 		Expect(rec.Code).To(Equal(http.StatusOK))
 
-		list := &configv1.HTTPCLIToolList{}
+		list := &configv1.PluginList{}
 		err := json.NewDecoder(rec.Body).Decode(list)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(rec.Header().Get("Content-Type")).To(Equal("application/json"))
 		Expect(list.Items).To(HaveLen(1))
 		Expect(list.Items[0].Namespace).To(Equal("default"))
 		Expect(list.Items[0].Name).To(Equal("bash"))
-		Expect(list.Items[0].Description).To(Equal("just a test"))
-		Expect(list.Items[0].Platforms).To(Equal([]string{"linux/amd64"}))
-		Expect(list.Items[0].LatestVersion).To(Equal("v4.4.20"))
+		Expect(list.Items[0].Spec.ShortDescription).To(Equal("just a test"))
+		Expect(list.Items[0].Spec.Platforms).To(HaveLen(1))
+		Expect(list.Items[0].Spec.Platforms[0].Platform).To(Equal("linux/amd64"))
+		Expect(list.Items[0].Spec.Version).To(Equal("v4.4.20"))
 	})
 
-	It("should list CLITools for specific platform", func() {
-		req := httptest.NewRequest("GET", "/v1/tools/?platform=linux/amd64", nil)
+	It("should list Plugins for specific platform", func() {
+		req := httptest.NewRequest("GET", "/v1/plugins/?platform=linux/amd64", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
 		Expect(rec.Code).To(Equal(http.StatusOK))
 
-		list := &configv1.HTTPCLIToolList{}
+		list := &configv1.PluginList{}
 		err := json.NewDecoder(rec.Body).Decode(list)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(rec.Header().Get("Content-Type")).To(Equal("application/json"))
 		Expect(list.Items).To(HaveLen(1))
 		Expect(list.Items[0].Namespace).To(Equal("default"))
 		Expect(list.Items[0].Name).To(Equal("bash"))
-		Expect(list.Items[0].Description).To(Equal("just a test"))
-		Expect(list.Items[0].Platforms).To(Equal([]string{"linux/amd64"}))
-		Expect(list.Items[0].LatestVersion).To(Equal("v4.4.20"))
+		Expect(list.Items[0].Spec.ShortDescription).To(Equal("just a test"))
+		Expect(list.Items[0].Spec.Platforms).To(HaveLen(1))
+		Expect(list.Items[0].Spec.Platforms[0].Platform).To(Equal("linux/amd64"))
+		Expect(list.Items[0].Spec.Version).To(Equal("v4.4.20"))
 	})
 
-	It("should not list unexpected CLITools", func() {
-		req := httptest.NewRequest("GET", "/v1/tools/", nil)
+	It("should not list unexpected Plugins", func() {
+		req := httptest.NewRequest("GET", "/v1/plugins/", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
 		Expect(rec.Code).To(Equal(http.StatusOK))
 
-		list := &configv1.HTTPCLIToolList{}
+		list := &configv1.PluginList{}
 		err := json.NewDecoder(rec.Body).Decode(list)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(rec.Header().Get("Content-Type")).To(Equal("application/json"))
@@ -204,166 +209,76 @@ var _ = Describe("tools", func() {
 		Expect(list.Items[0].Name).NotTo(Equal("curl"))
 	})
 
-	It("should not list unexpected CLITools for specific platform", func() {
-		req := httptest.NewRequest("GET", "/v1/tools/?platform=windows/amd64", nil)
+	It("should not list unexpected Plugins for specific platform", func() {
+		req := httptest.NewRequest("GET", "/v1/plugins/?platform=windows/amd64", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
 		Expect(rec.Code).To(Equal(http.StatusOK))
 
-		list := &configv1.HTTPCLIToolList{}
+		list := &configv1.PluginList{}
 		err := json.NewDecoder(rec.Body).Decode(list)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(rec.Header().Get("Content-Type")).To(Equal("application/json"))
 		Expect(list.Items).To(BeEmpty())
 	})
 
-	It("should get info for CLITool", func() {
-		req := httptest.NewRequest("GET", "/v1/tools/info/?namespace=default&name=bash", nil)
+	It("should get info for Plugin", func() {
+		req := httptest.NewRequest("GET", "/v1/plugins/info/?namespace=default&name=bash", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
 		Expect(rec.Code).To(Equal(http.StatusOK))
 
-		item := &configv1.HTTPCLIToolInfo{}
+		item := &configv1.Plugin{}
 		err := json.NewDecoder(rec.Body).Decode(item)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(rec.Header().Get("Content-Type")).To(Equal("application/json"))
 		Expect(item.Namespace).To(Equal("default"))
 		Expect(item.Name).To(Equal("bash"))
-		Expect(item.Description).To(Equal("just a test"))
-		Expect(item.Versions).NotTo(BeEmpty())
-		Expect(item.Versions[0].Version).To(Equal("v4.4.20"))
-		Expect(item.Versions[0].Binaries).NotTo(BeEmpty())
-		Expect(item.Versions[0].Binaries[0].Platform).To(Equal("linux/amd64"))
-		Expect(item.Versions[0].Binaries[0].Image).To(Equal("redhat/ubi8-micro:latest"))
-		Expect(item.Versions[0].Binaries[0].Path).To(Equal("/usr/bin/bash"))
+		Expect(item.Spec.ShortDescription).To(Equal("just a test"))
+		Expect(item.Spec.Version).To(Equal("v4.4.20"))
+		Expect(item.Spec.Platforms).NotTo(BeEmpty())
+		Expect(item.Spec.Platforms[0].Platform).To(Equal("linux/amd64"))
+		Expect(item.Spec.Platforms[0].Image).To(Equal("redhat/ubi8-micro:latest"))
+		Expect(item.Spec.Platforms[0].Files).To(HaveLen(1))
+		Expect(item.Spec.Platforms[0].Files[0].From).To(Equal("/usr/bin/bash"))
+		Expect(item.Spec.Platforms[0].Files[0].To).To(Equal("."))
 	})
 
-	It("should get info for latest version of CLITool", func() {
-		req := httptest.NewRequest("GET", "/v1/tools/info/?namespace=default&name=bash&version=latest", nil)
-		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, req)
-
-		Expect(rec.Code).To(Equal(http.StatusOK))
-
-		item := &configv1.HTTPCLIToolInfo{}
-		err := json.NewDecoder(rec.Body).Decode(item)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(rec.Header().Get("Content-Type")).To(Equal("application/json"))
-		Expect(item.Namespace).To(Equal("default"))
-		Expect(item.Name).To(Equal("bash"))
-		Expect(item.Description).To(Equal("just a test"))
-		Expect(item.Versions).NotTo(BeEmpty())
-		Expect(item.Versions[0].Version).To(Equal("v4.4.20"))
-		Expect(item.Versions[0].Binaries).NotTo(BeEmpty())
-		Expect(item.Versions[0].Binaries[0].Platform).To(Equal("linux/amd64"))
-		Expect(item.Versions[0].Binaries[0].Image).To(Equal("redhat/ubi8-micro:latest"))
-		Expect(item.Versions[0].Binaries[0].Path).To(Equal("/usr/bin/bash"))
-	})
-
-	It("should get info for specific version of CLITool", func() {
-		req := httptest.NewRequest("GET", "/v1/tools/info/?namespace=default&name=bash&version=v4.4.20", nil)
-		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, req)
-
-		Expect(rec.Code).To(Equal(http.StatusOK))
-
-		item := &configv1.HTTPCLIToolInfo{}
-		err := json.NewDecoder(rec.Body).Decode(item)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(rec.Header().Get("Content-Type")).To(Equal("application/json"))
-		Expect(item.Namespace).To(Equal("default"))
-		Expect(item.Name).To(Equal("bash"))
-		Expect(item.Description).To(Equal("just a test"))
-		Expect(item.Versions).NotTo(BeEmpty())
-		Expect(item.Versions[0].Version).To(Equal("v4.4.20"))
-		Expect(item.Versions[0].Binaries).NotTo(BeEmpty())
-		Expect(item.Versions[0].Binaries[0].Platform).To(Equal("linux/amd64"))
-		Expect(item.Versions[0].Binaries[0].Image).To(Equal("redhat/ubi8-micro:latest"))
-		Expect(item.Versions[0].Binaries[0].Path).To(Equal("/usr/bin/bash"))
-	})
-
-	It("should download the requested CLITool", func() {
-		req := httptest.NewRequest("GET", "/v1/tools/download/?namespace=default&name=bash&platform=linux/amd64", nil)
+	It("should download the requested Plugin", func() {
+		req := httptest.NewRequest("GET", "/v1/plugins/download/?namespace=default&name=bash&platform=linux/amd64", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
 		Expect(rec.Code).To(Equal(http.StatusOK))
 		Expect(rec.Header().Get("Content-Type")).To(Equal("application/octet-stream"))
-		Expect(rec.Header().Get("Content-Disposition")).To(Equal("attachment; filename=bash"))
+		Expect(rec.Header().Get("Content-Encoding")).To(Equal("gzip"))
+		Expect(rec.Header().Get("Content-Disposition")).To(Equal("attachment; filename=bash.tar.gz"))
 		Expect(rec.Header().Get("Content-Transfer-Encoding")).To(Equal("binary"))
+		Expect(rec.Body).NotTo(BeNil())
 		Expect(rec.Body.Bytes()).NotTo(BeEmpty())
 	})
 
-	It("should have calculated the digest after a download", func() {
-		req := httptest.NewRequest("GET", "/v1/tools/info/?namespace=default&name=bash&version=v4.4.20", nil)
+	It("should be git-compatible", func() {
+		req := httptest.NewRequest("GET", "/v1/my-repo.git/info/refs?service=git-upload-pack", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
 		Expect(rec.Code).To(Equal(http.StatusOK))
+		Expect(rec.Body).NotTo(BeNil())
+		Expect(rec.Body.Len()).NotTo(BeZero())
 
-		item := &configv1.HTTPCLIToolInfo{}
-		err := json.NewDecoder(rec.Body).Decode(item)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(rec.Header().Get("Content-Type")).To(Equal("application/json"))
-		Expect(item.Namespace).To(Equal("default"))
-		Expect(item.Name).To(Equal("bash"))
-		Expect(item.Description).To(Equal("just a test"))
-		Expect(item.Versions).NotTo(BeEmpty())
-		Expect(item.Versions[0].Version).To(Equal("v4.4.20"))
-		Expect(item.Versions[0].Binaries).NotTo(BeEmpty())
-		Expect(item.Versions[0].Binaries[0].Platform).To(Equal("linux/amd64"))
-		Expect(item.Versions[0].Binaries[0].Image).To(Equal("redhat/ubi8-micro:latest"))
-		Expect(item.Versions[0].Binaries[0].Path).To(Equal("/usr/bin/bash"))
-		Expect(item.Digests).NotTo(BeEmpty())
-		Expect(item.Digests[0].Name).To(Equal("v4.4.20/linux/amd64"))
-		Expect(item.Digests[0].Calculated).NotTo(BeZero())
-		Expect(item.Digests[0].Digest).To(ContainSubstring("sha256:"))
-	})
+		body := rec.Body.String()
+		Expect(body).To(HavePrefix("001e# service=git-upload-pack\n0000"))
+		Expect(body).To(ContainSubstring("HEAD\x00agent=go-git"))
+		Expect(body).To(ContainSubstring("symref=HEAD:refs/heads/master"))
+		Expect(body).To(HaveSuffix("refs/heads/master\n0000"))
 
-	It("should get info for CLITool from digest", func() {
-		By("getting a known digest first")
-		req := httptest.NewRequest("GET", "/v1/tools/info/?namespace=default&name=bash&version=v4.4.20", nil)
-		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, req)
-
-		Expect(rec.Code).To(Equal(http.StatusOK))
-
-		item := &configv1.HTTPCLIToolInfo{}
-		err := json.NewDecoder(rec.Body).Decode(item)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(item.Digests).NotTo(BeEmpty())
-		Expect(item.Digests[0].Name).To(Equal("v4.4.20/linux/amd64"))
-		Expect(item.Digests[0].Calculated).NotTo(BeZero())
-		Expect(item.Digests[0].Digest).To(ContainSubstring("sha256:"))
-
-		By("using known digest to query for the tool")
-		digest := item.Digests[0].Digest
-		req = httptest.NewRequest("GET", "/v1/tools/info/?digest="+digest, nil)
-		rec = httptest.NewRecorder()
-		handler.ServeHTTP(rec, req)
-
-		Expect(rec.Code).To(Equal(http.StatusOK))
-
-		Expect(rec.Code).To(Equal(http.StatusOK))
-
-		item = &configv1.HTTPCLIToolInfo{}
-		err = json.NewDecoder(rec.Body).Decode(item)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(rec.Header().Get("Content-Type")).To(Equal("application/json"))
-		Expect(item.Namespace).To(Equal("default"))
-		Expect(item.Name).To(Equal("bash"))
-		Expect(item.Description).To(Equal("just a test"))
-		Expect(item.Versions).NotTo(BeEmpty())
-		Expect(item.Versions[0].Version).To(Equal("v4.4.20"))
-		Expect(item.Versions[0].Binaries).NotTo(BeEmpty())
-		Expect(item.Versions[0].Binaries[0].Platform).To(Equal("linux/amd64"))
-		Expect(item.Versions[0].Binaries[0].Image).To(Equal("redhat/ubi8-micro:latest"))
-		Expect(item.Versions[0].Binaries[0].Path).To(Equal("/usr/bin/bash"))
-		Expect(item.Digests).NotTo(BeEmpty())
-		Expect(item.Digests[0].Name).To(Equal("v4.4.20/linux/amd64"))
-		Expect(item.Digests[0].Calculated).NotTo(BeZero())
-		Expect(item.Digests[0].Digest).To(ContainSubstring("sha256:"))
+		By("getting a hash from the response")
+		hexStart := strings.Index(body, "\n003f")
+		hexStop := strings.Index(body, " refs/heads/master")
+		hex := body[hexStart+1 : hexStop]
+		Expect(hex).To(HaveLen(44))
 	})
 })

@@ -2,6 +2,7 @@ package image
 
 import (
 	"archive/tar"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -11,24 +12,18 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
 
-// Target represents a destination and source target.
-type Target struct {
-	// Destination is the io.Writer to write to.
-	Destination io.Writer
-
-	// Source is the file to extract from the image.
-	Source string
-}
-
 // ExtractOptions are used for the Extract operation.
 type ExtractOptions struct {
 	// Tarball, if not-empty, is the io.Writer to write the image's filesystem to as a tarball.
-	// If this is set, the Targets option is ignored.
+	// If this is set, the Targets and Destination options are ignored.
 	Tarball io.Writer
 
 	// Targets are a list of source files within the image to copy paired with a destination io.Writer.
 	// The same `Target.Source` cannot be specified more than once per extract.
-	Targets []Target
+	Targets []string
+
+	// Destination to write the targets to in tar.gz format.
+	Destination io.Writer
 }
 
 // Extract an image's filesystem as a tarball, or individual files from the image.
@@ -43,10 +38,10 @@ func Extract(img v1.Image, opts *ExtractOptions) error {
 
 	targets := map[string]struct{}{}
 	for _, t := range opts.Targets {
-		if _, ok := targets[t.Source]; ok {
-			return fmt.Errorf("duplicate target source detected: %s", t.Source)
+		if _, ok := targets[t]; ok {
+			return fmt.Errorf("duplicate target source detected: %s", t)
 		}
-		targets[t.Source] = struct{}{}
+		targets[t] = struct{}{}
 	}
 
 	layers, err := img.Layers()
@@ -55,6 +50,11 @@ func Extract(img v1.Image, opts *ExtractOptions) error {
 	}
 
 	processedTargets := map[string]struct{}{}
+
+	gw := gzip.NewWriter(opts.Destination)
+	defer gw.Close()
+	tw := tar.NewWriter(gw)
+	defer tw.Close()
 
 	// we iterate through the layers in reverse order because it makes handling
 	// whiteout layers more efficient, since we can just keep track of the removed
@@ -103,9 +103,13 @@ func Extract(img v1.Image, opts *ExtractOptions) error {
 
 			// determine if we care about the given file
 			for _, target := range opts.Targets {
-				if header.Name == strings.TrimPrefix(target.Source, "/") {
+				if header.Name == strings.TrimPrefix(target, "/") {
 					processedTargets[header.Name] = struct{}{}
-					if _, err := io.Copy(target.Destination, tarReader); err != nil {
+					if err := tw.WriteHeader(header); err != nil {
+						return fmt.Errorf("could not write tar header: %s, %v", header.Name, err)
+					}
+
+					if _, err := io.Copy(tw, tarReader); err != nil {
 						return fmt.Errorf("could not copy %s: %v", header.Name, err)
 					}
 					break

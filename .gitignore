@@ -23,3 +23,6 @@ testbin/*
 *.swp
 *.swo
 *~
+
+# generated temporary files
+config/crd/bases/_.yaml

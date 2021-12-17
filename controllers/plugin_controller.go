@@ -27,26 +27,26 @@ import (
 	configv1 "github.com/deejross/openshift-cli-manager/api/v1"
 )
 
-// CLIToolReconciler reconciles a CLITool object
-type CLIToolReconciler struct {
+// PluginReconciler reconciles a Plugin object.
+type PluginReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=config.openshift.io,resources=clitools,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=config.openshift.io,resources=clitools/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=config.openshift.io,resources=clitools/finalizers,verbs=update
+//+kubebuilder:rbac:groups=config.openshift.io,resources=plugin,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=config.openshift.io,resources=plugin/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=config.openshift.io,resources=plugin/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the CLITool object against the actual cluster state, and then
+// the Plugin object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
-func (r *CLIToolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
 	// your logic here
@@ -55,8 +55,8 @@ func (r *CLIToolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *CLIToolReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *PluginReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&configv1.CLITool{}).
+		For(&configv1.Plugin{}).
 		Complete(r)
 }
