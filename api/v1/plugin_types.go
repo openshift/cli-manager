@@ -66,7 +66,7 @@ type PluginPlatform struct {
 
 	// Files is a list of file locations within the image that need to be extracted.
 	// +required
-	Files []FileOperation `json:"files"`
+	Files []FileLocation `json:"files"`
 
 	// Bin specifies the path to the plugin executable.
 	// The path is relative to the root of the installation folder.
@@ -75,9 +75,9 @@ type PluginPlatform struct {
 	Bin string `json:"bin"`
 }
 
-// PluginFileOperation specifies a file copying operation from plugin archive to the
+// FileLocation specifies a file copying operation from plugin archive to the
 // installation directory.
-type FileOperation struct {
+type FileLocation struct {
 	// From is the absolute file path within the image to copy from.
 	// Directories and wildcards are not currently supported.
 	// +required

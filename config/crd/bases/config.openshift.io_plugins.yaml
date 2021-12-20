@@ -60,8 +60,8 @@ spec:
                       description: Files is a list of file locations within the image
                         that need to be extracted.
                       items:
-                        description: PluginFileOperation specifies a file copying
-                          operation from plugin archive to the installation directory.
+                        description: FileLocation specifies a file copying operation
+                          from plugin archive to the installation directory.
                         properties:
                           from:
                             description: From is the absolute file path within the

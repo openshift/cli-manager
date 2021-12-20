@@ -96,7 +96,7 @@ var _ = BeforeSuite(func() {
 					Platform: "linux/amd64",
 					Image:    "redhat/ubi8-micro:latest",
 					Bin:      "bash",
-					Files: []configv1.FileOperation{
+					Files: []configv1.FileLocation{
 						{
 							From: "/usr/bin/bash",
 							To:   ".",
