@@ -1,6 +1,11 @@
 # OpenShift CLI Manager
 This is a Kubernetes controller intended to be used within an OpenShift cluster that adds additional functionality to the `oc` command to install and manage additional CLI plugins via `krew` in a disconnected environment.
 
+## Status
+
+### TECH PREVIEW
+This project is currently under development, however, comments and feedback are always welcome!
+
 ## Motivation
 In disconnected environments, it is more difficult to install and manage CLI plugins. The existing mechanism within OpenShift for providing additional CLI tools (i.e. `ConsoleCLIDownload`) provides a local copy of `oc`, but for other tools it provides internet-facing links that are unreachable in disconnected environments.
 
@@ -147,3 +152,33 @@ GET /v1/plugins/download/?namespace=default&name=bash&platform=linux/amd64
 
 #### Response
 A successful response will contain the tar.gz archive of the plugin's files for the requested platform.
+
+## Installation
+While in tech preview status, installation is a manual process:
+
+```shell
+# Create the CRD
+oc apply -f config/crd/bases/config.openshift.io_plugins.yaml
+
+# Create the project for the operator
+oc create project openshift-cli-manager
+
+# Select the new project
+oc project openshift-cli-manager
+
+# Create new service account
+oc apply -f config/rbac/service_account.yaml
+
+# Apply the roles
+oc apply -f config/rbac/leader_election_role.yaml
+oc apply -f config/rbac/role.yaml
+
+# Apply the role bindings
+oc apply -f config/rbac/leader_election_role_binding.yaml
+oc apply -f config/rbac/role_binding.yaml
+
+# Apply the deployment
+oc apply -f config/manager/manager.yaml
+
+# TODO: create service and route for controller
+```
