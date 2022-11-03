@@ -161,10 +161,10 @@ While in tech preview status, installation is a manual process:
 oc apply -f config/crd/bases/config.openshift.io_plugins.yaml
 
 # Create the project for the operator
-oc create project openshift-cli-manager
+oc create project cli-manager
 
 # Select the new project
-oc project openshift-cli-manager
+oc project cli-manager
 
 # Create new service account
 oc apply -f config/rbac/service_account.yaml
@@ -177,8 +177,9 @@ oc apply -f config/rbac/role.yaml
 oc apply -f config/rbac/leader_election_role_binding.yaml
 oc apply -f config/rbac/role_binding.yaml
 
-# Apply the deployment
-oc apply -f config/manager/manager.yaml
+# Create new deployment
+oc new-app --name cli-manager https://github.com/deejross/openshift-cli.manager
 
-# TODO: create service and route for controller
+# Expose the controller's API
+oc expose dc cli-manager --port=8000
 ```
