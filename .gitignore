@@ -7,6 +7,7 @@
 *.dylib
 bin
 testbin/*
+Dockerfile.cross
 
 # Test binary, build with `go test -c`
 *.test
@@ -23,6 +24,3 @@ testbin/*
 *.swp
 *.swo
 *~
-
-# generated temporary files
-config/crd/bases/_.yaml

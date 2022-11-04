@@ -1,5 +1,5 @@
 /*
-Copyright 2021.
+Copyright 2022.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// PluginSpec defines the desired state of Plugin.
+// PluginSpec defines the desired state of Plugin
 type PluginSpec struct {
 	// ShortDescription of the plugin.
 	// +required
@@ -94,7 +94,7 @@ type PluginStatus struct{}
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// Plugin is the Schema for the plugin API.
+// Plugin is the Schema for the plugins API
 type Plugin struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -105,7 +105,7 @@ type Plugin struct {
 
 //+kubebuilder:object:root=true
 
-// PluginList contains a list of Plugins.
+// PluginList contains a list of Plugin
 type PluginList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

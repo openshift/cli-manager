@@ -1,5 +1,5 @@
 /*
-Copyright 2021.
+Copyright 2022.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 	configv1 "github.com/deejross/openshift-cli-manager/api/v1"
 )
 
-// PluginReconciler reconciles a Plugin object.
+// PluginReconciler reconciles a Plugin object
 type PluginReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
@@ -46,11 +46,11 @@ type PluginReconciler struct {
 // the user.
 //
 // For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
 func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
-	// your logic here
+	// TODO(user): your logic here
 
 	return ctrl.Result{}, nil
 }
