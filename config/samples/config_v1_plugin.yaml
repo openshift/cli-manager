@@ -1,0 +1,12 @@
+apiVersion: config.openshift.io/v1
+kind: Plugin
+metadata:
+  labels:
+    app.kubernetes.io/name: plugin
+    app.kubernetes.io/instance: plugin-sample
+    app.kubernetes.io/part-of: openshift-cli-manager2
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: openshift-cli-manager2
+  name: plugin-sample
+spec:
+  # TODO(user): Add fields here
