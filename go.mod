@@ -1,4 +1,4 @@
-module github.com/deejross/openshift-cli-manager
+module github.com/openshift/cli-manager
 
 go 1.19
 

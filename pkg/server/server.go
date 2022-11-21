@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	apiv1 "github.com/deejross/openshift-cli-manager/pkg/server/v1"
 	"github.com/go-logr/logr"
+	apiv1 "github.com/openshift/cli-manager/pkg/server/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

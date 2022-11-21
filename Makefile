@@ -28,8 +28,8 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# openshift.io/openshift-cli-manager2-bundle:$VERSION and openshift.io/openshift-cli-manager2-catalog:$VERSION.
-IMAGE_TAG_BASE ?= openshift.io/openshift-cli-manager2
+# openshift.io/cli-manager-bundle:$VERSION and openshift.io/cli-manager-catalog:$VERSION.
+IMAGE_TAG_BASE ?= openshift.io/cli-manager
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)

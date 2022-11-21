@@ -32,9 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	configv1 "github.com/deejross/openshift-cli-manager/api/v1"
-	"github.com/deejross/openshift-cli-manager/controllers"
-	"github.com/deejross/openshift-cli-manager/pkg/server"
+	configv1 "github.com/openshift/cli-manager/api/v1"
+	"github.com/openshift/cli-manager/controllers"
+	"github.com/openshift/cli-manager/pkg/server"
 	//+kubebuilder:scaffold:imports
 )
 

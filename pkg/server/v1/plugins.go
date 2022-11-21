@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	configv1 "github.com/deejross/openshift-cli-manager/api/v1"
-	"github.com/deejross/openshift-cli-manager/pkg/image"
+	configv1 "github.com/openshift/cli-manager/api/v1"
+	"github.com/openshift/cli-manager/pkg/image"
 	"sigs.k8s.io/yaml"
 
 	git "github.com/go-git/go-git/v5"
@@ -530,7 +530,7 @@ func hostFromRequest(r *http.Request) string {
 		proto = p
 	}
 
-	host := "api-openshift-cli-manager.svc.local"
+	host := "api-cli-manager.svc.local"
 	if h := r.Header.Get("Host"); len(h) > 0 {
 		host = h
 	}

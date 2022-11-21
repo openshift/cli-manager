@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	configv1 "github.com/deejross/openshift-cli-manager/api/v1"
+	configv1 "github.com/openshift/cli-manager/api/v1"
 )
 
 // PluginReconciler reconciles a Plugin object
