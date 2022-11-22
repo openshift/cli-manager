@@ -178,7 +178,7 @@ oc apply -f config/rbac/leader_election_role_binding.yaml
 oc apply -f config/rbac/role_binding.yaml
 
 # Create new deployment
-oc new-app --name cli-manager https://github.com/deejross/openshift-cli.manager
+oc new-app --name cli-manager https://github.com/openshift/openshift-cli.manager
 
 # Expose the controller's API
 oc expose dc cli-manager --port=8000

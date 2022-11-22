@@ -4,8 +4,8 @@ layout:
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
-projectName: openshift-cli-manager
-repo: github.com/deejross/openshift-cli-manager
+projectName: cli-manager
+repo: github.com/openshift/cli-manager
 resources:
 - api:
     crdVersion: v1
@@ -14,6 +14,6 @@ resources:
   domain: openshift.io
   group: config
   kind: Plugin
-  path: github.com/deejross/openshift-cli-manager/api/v1
+  path: github.com/openshift/cli-manager/api/v1
   version: v1
 version: "3"
