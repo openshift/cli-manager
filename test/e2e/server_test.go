@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	configv1 "github.com/openshift/cli-manager/api/v1"
+	"github.com/openshift/cli-manager/pkg/server"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -80,7 +81,7 @@ var _ = BeforeSuite(func() {
 	Expect(cli).NotTo(BeNil())
 
 	log = ctrl.Log.WithName("plugins_test")
-	handler = NewHTTPHandler(cli, log)
+	handler = server.NewHTTPHandler(cli, log)
 
 	// load some test resources
 	plugin := &configv1.Plugin{

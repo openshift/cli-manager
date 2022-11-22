@@ -1,3 +1,26 @@
+.PHONY: all
+all: build
+
+# Include the library makefile
+include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
+	golang.mk \
+	targets/openshift/images.mk \
+	targets/openshift/codegen.mk \
+	targets/openshift/deps.mk \
+	targets/openshift/crd-schema-gen.mk \
+)
+
+GO_TEST_PACKAGES :=./pkg/... ./cmd/...
+GO_TEST_FLAGS :=-v
+
+# This will call a macro called "build-image" which will generate image specific targets based on the parameters:
+# $0 - macro name
+# $1 - target name
+# $2 - image ref
+# $3 - Dockerfile path
+# $4 - context directory for image build
+$(call build-image,ocp-cli-manager,$(IMAGE_REGISTRY)/ocp/4.13:cli-manager, ./Dockerfile.rhel7,.)
+
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -63,9 +86,6 @@ endif
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
-.PHONY: all
-all: build
-
 ##@ General
 
 # The help target prints out all targets with their descriptions organized
@@ -79,9 +99,9 @@ all: build
 # More info on the awk command:
 # http://linuxcommand.org/lc3_adv_awk.php
 
-.PHONY: help
-help: ## Display this help.
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+# .PHONY: help
+# help: ## Display this help.
+# 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Development
 
@@ -106,10 +126,6 @@ test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
 
 ##@ Build
-
-.PHONY: build
-build: generate fmt vet ## Build manager binary.
-	go build -o bin/manager main.go
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
