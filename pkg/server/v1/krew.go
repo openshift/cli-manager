@@ -4,6 +4,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const KrewGitRepositoryPath = "/cli-manager/"
+
 // Plugin describes a plugin manifest file.
 type Plugin struct {
 	metav1.TypeMeta   `json:",inline" yaml:",inline"`

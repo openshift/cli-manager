@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	v1 "github.com/openshift/cli-manager/pkg/server/v1"
 	"net/http"
 	"os"
 
@@ -34,7 +35,6 @@ import (
 
 	configv1 "github.com/openshift/cli-manager/api/v1"
 	"github.com/openshift/cli-manager/controllers"
-	"github.com/openshift/cli-manager/pkg/server"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -113,9 +113,13 @@ func main() {
 	}
 
 	go func() {
-		handler := server.NewHTTPHandler(mgr.GetClient(), mgr.GetLogger())
+		http.HandleFunc("/v1/plugins/download/", func(writer http.ResponseWriter, request *http.Request) {
+			v1.HandleDownloadPlugin(writer, request, mgr.GetClient())
+		})
+		http.HandleFunc("/v1/info/refs", v1.HandleGitAdversitement)
+		http.HandleFunc("/v1/git-upload-pack", v1.HandleGitUploadPack)
 		setupLog.Info("API server starting to listen", "addr", apiAddr)
-		if err := http.ListenAndServe(apiAddr, handler); err != nil {
+		if err := http.ListenAndServe(apiAddr, nil); err != nil {
 			setupLog.Error(err, "problem starting API")
 		}
 	}()
