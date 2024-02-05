@@ -60,126 +60,19 @@ The most common are:
 A complete list of all supported platforms (i.e operating systems and architectures) can be found here: https://github.com/golang/go/blob/master/src/go/build/syslist.go
 
 ## API Endpoints
-### `GET/LIST /v1/plugins/`
-List available plugins.
-
-#### Request
-Fields:
-* `platform`: (Optional) Limit results to plugins that support the given platform
-
-#### Response
-JSON representation of the custom resource.
-
-Example:
-```json
-{
-  "items": [
-    {
-      "namespace": "default",
-      "name": "bash",
-      "description": "just a test",
-      "version": "v4.4.20",
-      "platforms": [
-        {
-          "platform": "linux/amd64",
-          "image": "redhat/ubi8-micro:latest",
-          "files": [
-            {
-              "from": "/usr/bin/bash",
-              "to": "."
-            }
-          ],
-          "bin": "bash"
-        }
-      ]
-    }
-  ]
-}
-```
-
-### `GET /v1/plugins/info/`
-Get binary information about a given plugin.
-
-#### Request
-The following query parameters are required:
-* `namespace`: Namespace of the Plugin resource
-* `name`: Name of the Plugin resource
-
-Example:
-```http
-GET /v1/plugins/info/?namespace=default&name=bash
-```
-
-#### Response
-JSON representation of the custom resource.
-
-Example:
-```json
-{
-  "namespace": "default",
-  "name": "bash",
-  "description": "just a test",
-  "version": "v4.4.20",
-  "platforms": [
-    {
-      "platform": "linux/amd64",
-      "image": "redhat/ubi8-micro:latest",
-      "files": [
-        {
-          "from": "/usr/bin/bash",
-          "to": "."
-        }
-      ],
-      "bin": "bash"
-    }
-  ]
-}
-```
 
 ### `GET /v1/plugins/download/`
 Download a plugin as a tar.gz archive.
 
 #### Request
 The following query parameters are required:
-* `namespace`: Namespace for the Plugin resource
 * `name`: Name of the Plugin resource
 * `platform`: Platform for the binary
 
 Example:
 ```http
-GET /v1/plugins/download/?namespace=default&name=bash&platform=linux/amd64
+GET /v1/plugins/download/?name=bash&platform=linux/amd64
 ```
 
 #### Response
 A successful response will contain the tar.gz archive of the plugin's files for the requested platform.
-
-## Installation
-While in tech preview status, installation is a manual process:
-
-```shell
-# Create the CRD
-oc apply -f config/crd/bases/config.openshift.io_plugins.yaml
-
-# Create the project for the operator
-oc create project cli-manager
-
-# Select the new project
-oc project cli-manager
-
-# Create new service account
-oc apply -f config/rbac/service_account.yaml
-
-# Apply the roles
-oc apply -f config/rbac/leader_election_role.yaml
-oc apply -f config/rbac/role.yaml
-
-# Apply the role bindings
-oc apply -f config/rbac/leader_election_role_binding.yaml
-oc apply -f config/rbac/role_binding.yaml
-
-# Create new deployment
-oc new-app --name cli-manager https://github.com/openshift/openshift-cli.manager
-
-# Expose the controller's API
-oc expose dc cli-manager --port=8000
-```
