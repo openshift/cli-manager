@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -187,7 +186,7 @@ func (l Path) WriteFile(name string, data []byte, perm os.FileMode) error {
 		return err
 	}
 
-	return ioutil.WriteFile(l.path(name), data, perm)
+	return os.WriteFile(l.path(name), data, perm)
 }
 
 // WriteBlob copies a file to the blobs/ directory in the Path from the given ReadCloser at
@@ -197,6 +196,7 @@ func (l Path) WriteBlob(hash v1.Hash, r io.ReadCloser) error {
 }
 
 func (l Path) writeBlob(hash v1.Hash, size int64, rc io.ReadCloser, renamer func() (v1.Hash, error)) error {
+	defer rc.Close()
 	if hash.Hex == "" && renamer == nil {
 		panic("writeBlob called an invalid hash and no renamer")
 	}
@@ -215,7 +215,7 @@ func (l Path) writeBlob(hash v1.Hash, size int64, rc io.ReadCloser, renamer func
 	// If a renamer func was provided write to a temporary file
 	open := func() (*os.File, error) { return os.Create(file) }
 	if renamer != nil {
-		open = func() (*os.File, error) { return ioutil.TempFile(dir, hash.Hex) }
+		open = func() (*os.File, error) { return os.CreateTemp(dir, hash.Hex) }
 	}
 	w, err := open()
 	if err != nil {
@@ -273,7 +273,7 @@ func (l Path) writeLayer(layer v1.Layer) error {
 	if errors.Is(err, stream.ErrNotComputed) {
 		// Allow digest errors, since streams may not have calculated the hash
 		// yet. Instead, use an empty value, which will be transformed into a
-		// random file name with `ioutil.TempFile` and the final digest will be
+		// random file name with `os.CreateTemp` and the final digest will be
 		// calculated after writing to a temp file and before renaming to the
 		// final path.
 		d = v1.Hash{Algorithm: "sha256", Hex: ""}
@@ -351,7 +351,7 @@ func (l Path) WriteImage(img v1.Image) error {
 	if err != nil {
 		return err
 	}
-	if err := l.WriteBlob(cfgName, ioutil.NopCloser(bytes.NewReader(cfgBlob))); err != nil {
+	if err := l.WriteBlob(cfgName, io.NopCloser(bytes.NewReader(cfgBlob))); err != nil {
 		return err
 	}
 
@@ -365,7 +365,7 @@ func (l Path) WriteImage(img v1.Image) error {
 		return err
 	}
 
-	return l.WriteBlob(d, ioutil.NopCloser(bytes.NewReader(manifest)))
+	return l.WriteBlob(d, io.NopCloser(bytes.NewReader(manifest)))
 }
 
 type withLayer interface {
