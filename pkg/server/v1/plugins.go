@@ -138,14 +138,14 @@ func HandleDownloadPlugin(w http.ResponseWriter, r *http.Request, cli client.Cli
 				return
 			}
 
-			http.Error(w, fmt.Sprintf("getting Plugin: name: %s, platform: %s err: %w", name, platform, err), http.StatusInternalServerError)
+			http.Error(w, fmt.Errorf("getting Plugin: name: %s, platform: %s err: %w", name, platform, err).Error(), http.StatusInternalServerError)
 			return
 		}
 	}
 
 	_, err = io.Copy(w, reader)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("getting Plugin: name: %s, platform: %s err: %w", name, platform, err), http.StatusInternalServerError)
+		http.Error(w, fmt.Errorf("getting Plugin: name: %s, platform: %s err: %w", name, platform, err).Error(), http.StatusInternalServerError)
 		return
 	}
 }
