@@ -5,53 +5,47 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+
+	"github.com/openshift/cli-manager/api/v1alpha1"
 )
 
-// ExtractOptions are used for the Extract operation.
-type ExtractOptions struct {
-	// Tarball, if not-empty, is the io.Writer to write the image's filesystem to as a tarball.
-	// If this is set, the Targets and Destination options are ignored.
-	Tarball io.Writer
+const TarballPath = "/var/run/plugins/"
 
-	// Targets are a list of source files within the image to copy paired with a destination io.Writer.
-	// The same `Target.Source` cannot be specified more than once per extract.
-	Targets []string
+// Pull an image down to the local filesystem.
+func Pull(src string, auth string) (v1.Image, error) {
+	craneOptions := []crane.Option{}
+	if len(auth) > 0 {
+		auth := authn.FromConfig(authn.AuthConfig{
+			Auth: auth,
+		})
+		craneOptions = append(craneOptions, crane.WithAuth(auth))
+	}
 
-	// Destination to write the targets to in tar.gz format.
-	Destination io.Writer
+	return crane.Pull(src, craneOptions...)
 }
 
 // Extract an image's filesystem as a tarball, or individual files from the image.
-func Extract(img v1.Image, opts *ExtractOptions) error {
-	if opts.Tarball != nil {
-		return crane.Export(img, opts.Tarball)
-	}
-
-	if opts.Targets == nil || len(opts.Targets) == 0 {
-		return fmt.Errorf("must provide at least one target")
-	}
-
-	targets := map[string]struct{}{}
-	for _, t := range opts.Targets {
-		if _, ok := targets[t]; ok {
-			return fmt.Errorf("duplicate target source detected: %s", t)
-		}
-		targets[t] = struct{}{}
-	}
-
+func Extract(img v1.Image, platform v1alpha1.PluginPlatform, destinationName string) ([]v1alpha1.FileLocation, error) {
 	layers, err := img.Layers()
 	if err != nil {
-		return fmt.Errorf("retrieving image layers: %v", err)
+		return nil, fmt.Errorf("retrieving image layers: %v", err)
 	}
 
-	processedTargets := map[string]struct{}{}
+	processedTargets := make(map[string]struct{})
 
-	gw := gzip.NewWriter(opts.Destination)
+	file, err := os.Create(destinationName)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	gw := gzip.NewWriter(file)
 	defer gw.Close()
 	tw := tar.NewWriter(gw)
 	defer tw.Close()
@@ -63,9 +57,8 @@ func Extract(img v1.Image, opts *ExtractOptions) error {
 		layer := layers[i]
 		layerReader, err := layer.Uncompressed()
 		if err != nil {
-			return fmt.Errorf("reading layer contents: %v", err)
+			return nil, fmt.Errorf("reading layer contents: %v", err)
 		}
-		defer layerReader.Close()
 
 		tarReader := tar.NewReader(layerReader)
 		for {
@@ -74,7 +67,8 @@ func Extract(img v1.Image, opts *ExtractOptions) error {
 				break
 			}
 			if err != nil {
-				return fmt.Errorf("reading tar: %v", err)
+				layerReader.Close()
+				return nil, fmt.Errorf("reading tar: %v", err)
 			}
 
 			// skip directories
@@ -102,21 +96,30 @@ func Extract(img v1.Image, opts *ExtractOptions) error {
 			}
 
 			// determine if we care about the given file
-			for _, target := range opts.Targets {
-				if header.Name == strings.TrimPrefix(target, "/") {
-					processedTargets[header.Name] = struct{}{}
+			for _, target := range platform.Files {
+				if header.Name == strings.TrimPrefix(target.From, "/") {
+					processedTargets[target.From] = struct{}{}
+					// TODO: Should we write it to target.To?
 					if err := tw.WriteHeader(header); err != nil {
-						return fmt.Errorf("could not write tar header: %s, %v", header.Name, err)
+						continue
 					}
 
 					if _, err := io.Copy(tw, tarReader); err != nil {
-						return fmt.Errorf("could not copy %s: %v", header.Name, err)
+						continue
 					}
 					break
 				}
 			}
 		}
+		layerReader.Close()
 	}
 
-	return nil
+	var fileLocation []v1alpha1.FileLocation
+	for _, f := range platform.Files {
+		if _, ok := processedTargets[f.From]; ok {
+			fileLocation = append(fileLocation, f)
+		}
+	}
+
+	return fileLocation, nil
 }
