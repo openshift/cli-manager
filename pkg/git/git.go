@@ -292,9 +292,7 @@ func HandleDownloadPlugin(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 
-	// set the appropriate response headers for downloading a binary
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Encoding", "gzip")
 	w.Header().Set("Content-Disposition", "attachment; filename="+fileName)
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 

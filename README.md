@@ -51,6 +51,33 @@ spec:
     bin: bash
 ```
 
+## Client Configuration
+
+In order to configure CLI Manager;
+
+* oc (or kubectl) is installed
+* Krew is installed. More details can be found https://krew.sigs.k8s.io/docs/user-guide/setup/install/
+* Custom index provided by OpenShift CLI Manager is defined in Krew;
+```sh
+$ ROUTE=$(oc get route/cli-manager -n openshift-cli-manager -o=jsonpath='{.spec.host}')
+$ CUSTOM_INDEX_NAME=ocp
+$ oc krew add index $CUSTOM_INDEX_NAME https://$ROUTE/cli-manager
+```
+
+To search, install or remove a plugin;
+
+```shell
+$ oc krew search test
+$ oc krew install $CUSTOM_INDEX_NAME/test
+$ oc krew remove test
+```
+
+To update to the latest version of plugin;
+
+```shell
+$ oc krew update
+```
+
 ### Available Platforms
 The most common are:
   * `darwin/amd64` (i.e. MacOS)
@@ -76,3 +103,16 @@ GET /v1/plugins/download/?name=bash&platform=linux/amd64
 
 #### Response
 A successful response will contain the tar.gz archive of the plugin's files for the requested platform.
+
+## OpenShift Self Signed Certificates
+
+OpenShift serves endpoints with the CA bundles that is self-signed within the cluster. Certificate authority field in kubeconfig is used to interact with these components.
+However, Krew does not provide a similar functionality to pass self-signed CA certificates explicitly as trusted to tackle unknown certificate errors. 
+As a result, it is up to user to define these self-signed certificates as trusted in their local environments.
+
+### Fedora
+
+```sh
+$ echo "$(oc config view --minify --flatten -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' | base64 --decode)" | sudo tee /etc/pki/ca-trust/source/anchors/cli.crt > /dev/null
+$ sudo update-ca-trust
+```
