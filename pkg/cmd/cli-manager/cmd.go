@@ -38,5 +38,5 @@ func getNamespace() string {
 	if podNamespace := os.Getenv(podNamespaceEnv); len(podNamespace) > 0 {
 		return podNamespace
 	}
-	return "openshift-cli-manager"
+	return "openshift-cli-manager-operator"
 }
