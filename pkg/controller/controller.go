@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -29,6 +30,16 @@ import (
 	"github.com/openshift/cli-manager/pkg/image"
 	krew "github.com/openshift/cli-manager/pkg/krew/v1alpha2"
 )
+
+type DockerConfigJson struct {
+	Auths DockerConfig `json:"auths"`
+}
+
+type DockerConfig map[string]DockerConfigEntry
+
+type DockerConfigEntry struct {
+	Auth string `json:"auth"`
+}
 
 type Controller struct {
 	factory.Controller
@@ -187,12 +198,23 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, ro
 			}
 
 			// ensure the Secret is of the expected type
-			if imagePullSecret.Type != corev1.SecretTypeDockercfg {
-				return nil, fmt.Errorf("misconfigured Plugin: name: %s, platform: %s, error: configured imagePullSecret %s for given platform combination is not of type: %s", plugin.Name, p, p.ImagePullSecret, corev1.SecretTypeDockercfg)
+			if imagePullSecret.Type != corev1.SecretTypeDockercfg && imagePullSecret.Type != corev1.SecretTypeDockerConfigJson {
+				return nil, fmt.Errorf("misconfigured Plugin: name: %s, platform: %s, error: configured imagePullSecret %s for given platform combination is not of type: %s or %s", plugin.Name, p, p.ImagePullSecret, corev1.SecretTypeDockercfg, corev1.SecretTypeDockerConfigJson)
 			}
 
-			// set the .dockercfg auth information for the image puller
-			imageAuth = string(imagePullSecret.Data[corev1.DockerConfigKey])
+			if imagePullSecret.Type == corev1.SecretTypeDockercfg {
+				// set the .dockercfg auth information for the image puller
+				imageAuth = string(imagePullSecret.Data[corev1.DockerConfigKey])
+			} else if imagePullSecret.Type == corev1.SecretTypeDockerConfigJson {
+				var dcr *DockerConfigJson
+				err = json.Unmarshal(imagePullSecret.Data[corev1.DockerConfigJsonKey], &dcr)
+				if err != nil || dcr == nil {
+					return nil, fmt.Errorf("unable to parse dockerjson %s to json", imagePullSecret.Name)
+				}
+				for _, val := range dcr.Auths {
+					imageAuth = val.Auth
+				}
+			}
 		}
 
 		// attempt to pull the image down locally
@@ -225,6 +247,7 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, ro
 			return nil, fmt.Errorf("could not get the route cli-manager in openshift-cli-manager namespace err: %w", err)
 		}
 
+		klog.Infof("plugin %s is ready to be served", plugin.Name)
 		kp := krew.Platform{
 			URI:    fmt.Sprintf("https://%s/cli-manager/plugins/download/?name=%s&platform=%s", r.Spec.Host, plugin.Name, strings.ReplaceAll(p.Platform, "/", "_")),
 			Sha256: checksum,
