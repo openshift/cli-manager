@@ -27,6 +27,9 @@ func NewCLIManagerCommand(name string) *cobra.Command {
 	cmd.Use = name
 	cmd.Short = "Start the CLI manager controllers"
 
+	cmd.Flags().BoolVar(&ServeArtifactAsHttp, "serve-artifacts-in-http", false, "serving artifact in HTTP instead of HTTPS. That is used for testing purposes and not recommended for production")
+	cmd.Flags().MarkHidden("serve-artifacts-in-http")
+
 	return cmd
 }
 

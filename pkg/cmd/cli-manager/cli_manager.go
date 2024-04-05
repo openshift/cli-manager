@@ -19,6 +19,8 @@ const (
 	PortNumber = 9449
 )
 
+var ServeArtifactAsHttp bool
+
 func RunCLIManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	dynamicClient, err := dynamic.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
@@ -41,7 +43,7 @@ func RunCLIManager(ctx context.Context, controllerContext *controllercmd.Control
 	}
 
 	informers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 0)
-	cliSyncController, err := controller.NewCLISyncController(repo, informers, client, route, controllerContext.EventRecorder)
+	cliSyncController, err := controller.NewCLISyncController(repo, informers, client, route, ServeArtifactAsHttp, controllerContext.EventRecorder)
 	if err != nil {
 		return err
 	}
