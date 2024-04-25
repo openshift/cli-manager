@@ -343,7 +343,7 @@ func TestCLIManager(t *testing.T) {
 		t.Fatalf("plugin execution failure response %s err %v", string(ver), err)
 	}
 	klog.Infof("plugin oc execution result \n %s", string(ver))
-	if string(ver) != "version" {
+	if !strings.Contains(string(ver), "Client Version:") {
 		t.Fatalf("unexpected output of plugin execution %s", string(ver))
 	}
 }
