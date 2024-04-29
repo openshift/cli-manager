@@ -14,6 +14,7 @@ import (
 const (
 	podNameEnv      = "POD_NAME"
 	podNamespaceEnv = "POD_NAMESPACE"
+	httpServeEnvVar = "ENABLE_INSECURE_HTTP_ARTIFACT_SERVE"
 )
 
 func NewCLIManagerCommand(name string) *cobra.Command {
@@ -27,7 +28,9 @@ func NewCLIManagerCommand(name string) *cobra.Command {
 	cmd.Use = name
 	cmd.Short = "Start the CLI manager controllers"
 
-	cmd.Flags().BoolVar(&ServeArtifactAsHttp, "serve-artifacts-in-http", false, "serving artifact in HTTP instead of HTTPS. That is used for testing purposes and not recommended for production")
+	if os.Getenv(httpServeEnvVar) == "true" {
+		cmd.Flags().BoolVar(&ServeArtifactAsHttp, "serve-artifacts-in-http", false, "serving artifact in HTTP instead of HTTPS. That is used for testing purposes only. Using the flag in production is at your own risk. This flag is not supported.")
+	}
 	cmd.Flags().MarkHidden("serve-artifacts-in-http")
 
 	return cmd
