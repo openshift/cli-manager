@@ -25,7 +25,7 @@ func NewCLIManagerCommand() *cobra.Command {
 		},
 	}
 
-	start := cli_manager.NewCLIManagerCommand("start", false)
+	start := cli_manager.NewCLIManagerCommand("start", true)
 	cmd.AddCommand(start)
 
 	return cmd

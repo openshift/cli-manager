@@ -4,9 +4,8 @@ COPY . .
 RUN make build --warn-undefined-variables
 
 FROM registry.ci.openshift.org/ocp/4.16:base-rhel9
-COPY --from=builder /go/src/github.com/openshift/cli-manager/cli-manager /usr/bin/
+COPY --from=builder /go/src/github.com/openshift/cli-manager/cli-manager-testing /usr/bin/cli-manager
 RUN dnf install -y git
-ENV ENABLE_INSECURE_HTTP_ARTIFACT_SERVE=true
 
 LABEL io.k8s.display-name="CLI Manager Command" \
       io.k8s.description="OpenShift is a platform for developing, building, and deploying containerized applications." \
