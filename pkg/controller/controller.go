@@ -47,10 +47,12 @@ type Controller struct {
 	repo   *git.Repo
 	client *kubernetes.Clientset
 	route  routeclient.RouteV1Interface
+
+	insecureHTTP bool
 }
 
 // NewCLISyncController creates CLI Sync Controller to react changes in Plugin resource
-func NewCLISyncController(repo *git.Repo, informers dynamicinformer.DynamicSharedInformerFactory, client *kubernetes.Clientset, route routeclient.RouteV1Interface, eventRecorder events.Recorder) (*Controller, error) {
+func NewCLISyncController(repo *git.Repo, informers dynamicinformer.DynamicSharedInformerFactory, client *kubernetes.Clientset, route routeclient.RouteV1Interface, insecureHTTP bool, eventRecorder events.Recorder) (*Controller, error) {
 	informer := informers.ForResource(schema.GroupVersionResource{
 		Group:    v1alpha1.GroupVersion.Group,
 		Version:  v1alpha1.GroupVersion.Version,
@@ -58,10 +60,11 @@ func NewCLISyncController(repo *git.Repo, informers dynamicinformer.DynamicShare
 	})
 
 	c := &Controller{
-		lister: informer.Lister(),
-		repo:   repo,
-		client: client,
-		route:  route,
+		lister:       informer.Lister(),
+		repo:         repo,
+		client:       client,
+		route:        route,
+		insecureHTTP: insecureHTTP,
 	}
 
 	c.Controller = factory.New().
@@ -123,7 +126,7 @@ func (c *Controller) sync(ctx context.Context, syncCtx factory.SyncContext) erro
 		return nil
 	}
 
-	err = UpsertPlugin(plugin, c.repo, c.client, c.route)
+	err = UpsertPlugin(plugin, c.repo, c.client, c.route, c.insecureHTTP)
 	if err != nil {
 		return err
 	}
@@ -143,8 +146,8 @@ func DeletePlugin(name string, repo *git.Repo) error {
 	return nil
 }
 
-func UpsertPlugin(plugin *v1alpha1.Plugin, repo *git.Repo, client *kubernetes.Clientset, route routeclient.RouteV1Interface) error {
-	k, err := convertKrewPlugin(plugin, client, route)
+func UpsertPlugin(plugin *v1alpha1.Plugin, repo *git.Repo, client *kubernetes.Clientset, route routeclient.RouteV1Interface, insecureHTTP bool) error {
+	k, err := convertKrewPlugin(plugin, client, route, insecureHTTP)
 	if err != nil {
 		return err
 	}
@@ -155,7 +158,7 @@ func UpsertPlugin(plugin *v1alpha1.Plugin, repo *git.Repo, client *kubernetes.Cl
 	return nil
 }
 
-func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, route routeclient.RouteV1Interface) (*krew.Plugin, error) {
+func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, route routeclient.RouteV1Interface, insecureHTTP bool) (*krew.Plugin, error) {
 	if plugin == nil {
 		return nil, nil
 	}
@@ -247,9 +250,14 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, ro
 			return nil, fmt.Errorf("could not get the route cli-manager in openshift-cli-manager namespace err: %w", err)
 		}
 
+		artifactURI := fmt.Sprintf("https://%s/cli-manager/plugins/download/?name=%s&platform=%s", r.Spec.Host, plugin.Name, strings.ReplaceAll(p.Platform, "/", "_"))
+		if insecureHTTP {
+			artifactURI = fmt.Sprintf("http://%s/cli-manager/plugins/download/?name=%s&platform=%s", r.Spec.Host, plugin.Name, strings.ReplaceAll(p.Platform, "/", "_"))
+		}
+
 		klog.Infof("plugin %s is ready to be served", plugin.Name)
 		kp := krew.Platform{
-			URI:    fmt.Sprintf("https://%s/cli-manager/plugins/download/?name=%s&platform=%s", r.Spec.Host, plugin.Name, strings.ReplaceAll(p.Platform, "/", "_")),
+			URI:    artifactURI,
 			Sha256: checksum,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
