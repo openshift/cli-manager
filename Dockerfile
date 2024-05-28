@@ -5,7 +5,7 @@ RUN make build --warn-undefined-variables
 
 FROM registry.redhat.io/rhel9-2-els/rhel:9.2-1222
 COPY --from=builder /go/src/github.com/openshift/cli-manager/cli-manager /usr/bin/
-RUN dnf install -y git
+COPY --from=builder /usr/bin/git /usr/bin/git
 
 LABEL io.k8s.display-name="CLI Manager Command" \
       io.k8s.description="OpenShift is a platform for developing, building, and deploying containerized applications." \
