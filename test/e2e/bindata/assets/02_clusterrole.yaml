@@ -16,7 +16,14 @@ rules:
     resources:
       - leases
     verbs:
-      - "*"
+      - create
+      - delete
+      - deletecollection
+      - get
+      - list
+      - patch
+      - update
+      - watch
   - apiGroups:
       - "route.openshift.io"
     resources:
