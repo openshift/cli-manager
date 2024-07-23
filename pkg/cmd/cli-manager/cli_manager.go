@@ -2,14 +2,17 @@ package cli_manager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	routeclient "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 
 	"github.com/openshift/cli-manager/pkg/controller"
 	"github.com/openshift/cli-manager/pkg/git"
@@ -49,8 +52,20 @@ func RunCLIManager(ctx context.Context, controllerContext *controllercmd.Control
 	}
 
 	mux := git.PrepareGitServer()
+	server := &http.Server{
+		Addr:         fmt.Sprintf(":%d", PortNumber),
+		Handler:      mux,
+		ReadTimeout:  5 * time.Minute,
+		WriteTimeout: 15 * time.Minute,
+		// 1MB size should be sufficient
+		MaxHeaderBytes: 1 << 20,
+	}
 
-	go http.ListenAndServe(fmt.Sprintf(":%d", PortNumber), mux)
+	go func() {
+		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			klog.Errorf("git server exited with error %s", err.Error())
+		}
+	}()
 	go informers.Start(ctx.Done())
 	go cliSyncController.Run(ctx, 1)
 	<-ctx.Done()
