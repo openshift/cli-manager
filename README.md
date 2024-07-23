@@ -1,4 +1,4 @@
-# OpenShift CLI Manager
+# CLI Manager
 This is a Kubernetes controller intended to be used within an OpenShift cluster that adds additional functionality to the `oc` command to install and manage additional CLI plugins via `krew` in a disconnected environment.
 
 ## Status
