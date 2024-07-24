@@ -273,9 +273,19 @@ func HandleDownloadPlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(name) > 100 {
+		http.Error(w, fmt.Sprintf("name %s too large", name), http.StatusBadRequest)
+		return
+	}
+
 	platform := r.URL.Query().Get("platform")
 	if len(platform) == 0 {
 		http.Error(w, "missing platform in query", http.StatusBadRequest)
+		return
+	}
+
+	if len(platform) > 20 {
+		http.Error(w, "invalid platform", http.StatusBadRequest)
 		return
 	}
 
