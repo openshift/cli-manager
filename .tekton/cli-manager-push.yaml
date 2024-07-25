@@ -7,7 +7,7 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: |
-     event == "push" && target_branch == "main" && (".tekton/cli-manager-push.yaml".pathChanged() || "api/***".patchChanged() || "cmd/***".patchChanged() || "dependencymagnet/***".patchChanged() || "pkg/***".patchChanged() || "vendor/***".patchChanged() || "Dockerfile".patchChanged())
+     event == "push" && target_branch == "main" && (".tekton/cli-manager-push.yaml".pathChanged() || "api/***".pathChanged() || "cmd/***".pathChanged() || "dependencymagnet/***".pathChanged() || "pkg/***".pathChanged() || "vendor/***".pathChanged() || "Dockerfile".pathChanged())
   labels:
     appstudio.openshift.io/application: cli-manager-operator
     appstudio.openshift.io/component: cli-manager

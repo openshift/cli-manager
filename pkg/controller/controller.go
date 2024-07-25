@@ -233,6 +233,10 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, ro
 			return nil, err
 		}
 
+		if len(files) == 0 {
+			return nil, fmt.Errorf("files are not found in the given From path in image")
+		}
+
 		dest, err := os.Open(destinationFileName)
 		if err != nil {
 			return nil, err
@@ -274,6 +278,9 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, ro
 				From: f.From,
 				To:   f.To,
 			})
+		}
+		if len(kp.Bin) == 0 {
+			kp.Bin = kp.Files[0].From
 		}
 		k.Spec.Platforms = append(k.Spec.Platforms, kp)
 	}
