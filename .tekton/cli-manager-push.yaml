@@ -6,9 +6,8 @@ metadata:
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "main"
-  creationTimestamp: null
+    pipelinesascode.tekton.dev/on-cel-expression: |
+     event == "push" && target_branch == "main" && (".tekton/cli-manager-push.yaml".pathChanged() || "api/***".patchChanged() || "cmd/***".patchChanged() || "dependencymagnet/***".patchChanged() || "pkg/***".patchChanged() || "vendor/***".patchChanged() || "Dockerfile".patchChanged())
   labels:
     appstudio.openshift.io/application: cli-manager-operator
     appstudio.openshift.io/component: cli-manager
