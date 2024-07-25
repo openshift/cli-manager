@@ -35,7 +35,7 @@ func Get() version.Info {
 func init() {
 	buildInfo := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "openshift_csi_snapshot_controller_operator",
+			Name: "openshift_cli_manager_operator",
 			Help: "A metric with a constant '1' value labeled by major, minor, git commit & git version from which OpenShift Network Operator was built.",
 		},
 		[]string{"major", "minor", "gitCommit", "gitVersion"},

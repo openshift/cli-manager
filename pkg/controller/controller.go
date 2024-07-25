@@ -247,7 +247,7 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, ro
 
 		r, err := route.Routes("openshift-cli-manager-operator").Get(context.Background(), "openshift-cli-manager", metav1.GetOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("could not get the route cli-manager in openshift-cli-manager namespace err: %w", err)
+			return nil, fmt.Errorf("could not get the route openshift-cli-manager in openshift-cli-manager-operator namespace err: %w", err)
 		}
 
 		artifactURI := fmt.Sprintf("https://%s/cli-manager/plugins/download/?name=%s&platform=%s", r.Spec.Host, plugin.Name, strings.ReplaceAll(p.Platform, "/", "_"))
