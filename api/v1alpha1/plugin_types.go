@@ -52,7 +52,8 @@ type PluginPlatform struct {
 	// Bin specifies the path to the plugin executable.
 	// The path is relative to the root of the installation folder.
 	// The binary will be linked after all FileOperations are executed.
-	// +required
+	// If not specified, the first From item in the Files is set.
+	// +optional
 	Bin string `json:"bin"`
 }
 
@@ -65,7 +66,9 @@ type FileLocation struct {
 	From string `json:"from"`
 
 	// To is the relative path within the root of the installation folder to place the file.
+	// Default is set to "." where points the default Krew directory.
 	// +required
+	// +kubebuilder:default:="."
 	To string `json:"to"`
 }
 
