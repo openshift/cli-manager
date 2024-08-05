@@ -8,22 +8,27 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
-
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic/dynamicinformer"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
+	"time"
 
 	routeclient "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8sver "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 
 	"github.com/openshift/cli-manager/api/v1alpha1"
 	"github.com/openshift/cli-manager/pkg/git"
@@ -43,16 +48,17 @@ type DockerConfigEntry struct {
 
 type Controller struct {
 	factory.Controller
-	lister cache.GenericLister
-	repo   *git.Repo
-	client *kubernetes.Clientset
-	route  routeclient.RouteV1Interface
+	lister        cache.GenericLister
+	repo          *git.Repo
+	client        *kubernetes.Clientset
+	dynamicClient *dynamic.DynamicClient
+	route         routeclient.RouteV1Interface
 
 	insecureHTTP bool
 }
 
 // NewCLISyncController creates CLI Sync Controller to react changes in Plugin resource
-func NewCLISyncController(repo *git.Repo, informers dynamicinformer.DynamicSharedInformerFactory, client *kubernetes.Clientset, route routeclient.RouteV1Interface, insecureHTTP bool, eventRecorder events.Recorder) (*Controller, error) {
+func NewCLISyncController(repo *git.Repo, informers dynamicinformer.DynamicSharedInformerFactory, client *kubernetes.Clientset, dynamicClient *dynamic.DynamicClient, route routeclient.RouteV1Interface, insecureHTTP bool, eventRecorder events.Recorder) (*Controller, error) {
 	informer := informers.ForResource(schema.GroupVersionResource{
 		Group:    v1alpha1.GroupVersion.Group,
 		Version:  v1alpha1.GroupVersion.Version,
@@ -60,11 +66,12 @@ func NewCLISyncController(repo *git.Repo, informers dynamicinformer.DynamicShare
 	})
 
 	c := &Controller{
-		lister:       informer.Lister(),
-		repo:         repo,
-		client:       client,
-		route:        route,
-		insecureHTTP: insecureHTTP,
+		lister:        informer.Lister(),
+		repo:          repo,
+		client:        client,
+		dynamicClient: dynamicClient,
+		route:         route,
+		insecureHTTP:  insecureHTTP,
 	}
 
 	c.Controller = factory.New().
@@ -94,13 +101,17 @@ func NewCLISyncController(repo *git.Repo, informers dynamicinformer.DynamicShare
 func (c *Controller) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	pluginName := syncCtx.QueueKey()
 	klog.V(4).Infof("CLI Manager sync is triggered for the key %s", pluginName)
-	obj, err := c.lister.Get(pluginName)
+	obj, err := c.dynamicClient.Resource(schema.GroupVersionResource{
+		Group:    "config.openshift.io",
+		Version:  "v1alpha1",
+		Resource: "plugins"}).Get(ctx, pluginName, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			err = DeletePlugin(pluginName, c.repo)
 			if err != nil {
 				return err
 			}
+			klog.Infof("plugin %s is successfully deleted", pluginName)
 			return nil
 		} else {
 			klog.Warningf("plugin %s retrieval from cache error %v", pluginName, err)
@@ -126,7 +137,12 @@ func (c *Controller) sync(ctx context.Context, syncCtx factory.SyncContext) erro
 		return nil
 	}
 
-	err = UpsertPlugin(plugin, c.repo, c.client, c.route, c.insecureHTTP)
+	err = DeletePlugin(pluginName, c.repo)
+	if err != nil {
+		klog.V(2).Infof("plugin %s can not be deleted", pluginName)
+	}
+
+	err = UpsertPlugin(plugin, c.repo, c.client, c.dynamicClient, c.route, c.insecureHTTP)
 	if err != nil {
 		return err
 	}
@@ -142,14 +158,24 @@ func DeletePlugin(name string, repo *git.Repo) error {
 		return err
 	}
 
-	os.Remove(fmt.Sprintf("%s/%s_*.tar.gz", image.TarballPath, name))
+	files, err := filepath.Glob(fmt.Sprintf("%s/%s_*.tar.gz", image.TarballPath, name))
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		os.Remove(file)
+	}
 	return nil
 }
 
-func UpsertPlugin(plugin *v1alpha1.Plugin, repo *git.Repo, client *kubernetes.Clientset, route routeclient.RouteV1Interface, insecureHTTP bool) error {
-	k, err := convertKrewPlugin(plugin, client, route, insecureHTTP)
+func UpsertPlugin(plugin *v1alpha1.Plugin, repo *git.Repo, client *kubernetes.Clientset, dynamicClient *dynamic.DynamicClient, route routeclient.RouteV1Interface, insecureHTTP bool) error {
+	k, success, err := convertKrewPlugin(plugin, client, dynamicClient, route, insecureHTTP)
 	if err != nil {
 		return err
+	}
+	if !success {
+		return nil
 	}
 	err = repo.Upsert(plugin.Name, k)
 	if err != nil {
@@ -158,9 +184,49 @@ func UpsertPlugin(plugin *v1alpha1.Plugin, repo *git.Repo, client *kubernetes.Cl
 	return nil
 }
 
-func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, route routeclient.RouteV1Interface, insecureHTTP bool) (*krew.Plugin, error) {
+func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, dynamicClient *dynamic.DynamicClient, route routeclient.RouteV1Interface, insecureHTTP bool) (*krew.Plugin, bool, error) {
 	if plugin == nil {
-		return nil, nil
+		return nil, false, nil
+	}
+	ctx := context.Background()
+	safePluginRegexp := regexp.MustCompile(`^[\w-]+$`)
+	if !safePluginRegexp.MatchString(plugin.Name) {
+		newCondition := metav1.Condition{
+			Status:  metav1.ConditionFalse,
+			Reason:  "InvalidField",
+			Message: fmt.Sprintf("invalid plugin name %s", plugin.Name),
+		}
+		err := updateStatusCondition(ctx, plugin, dynamicClient, newCondition)
+		if err != nil {
+			return nil, false, err
+		}
+		return nil, false, nil
+	}
+
+	if !strings.HasPrefix(plugin.Spec.Version, "v") {
+		newCondition := metav1.Condition{
+			Status:  metav1.ConditionFalse,
+			Reason:  "InvalidField",
+			Message: fmt.Sprintf("invalid version %s, should start with v like v0.0.0", plugin.Spec.Version),
+		}
+		err := updateStatusCondition(ctx, plugin, dynamicClient, newCondition)
+		if err != nil {
+			return nil, false, err
+		}
+		return nil, false, nil
+	}
+	_, err := k8sver.ParseSemantic(plugin.Spec.Version)
+	if err != nil {
+		newCondition := metav1.Condition{
+			Status:  metav1.ConditionFalse,
+			Reason:  "InvalidField",
+			Message: fmt.Sprintf("invalid version %s, should be in v0.0.0 format", plugin.Spec.Version),
+		}
+		err := updateStatusCondition(ctx, plugin, dynamicClient, newCondition)
+		if err != nil {
+			return nil, false, err
+		}
+		return nil, false, nil
 	}
 	k := &krew.Plugin{
 		TypeMeta: metav1.TypeMeta{
@@ -195,14 +261,35 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, ro
 				secret = secrets[0]
 			}
 			// if an imagePullSecret is defined for the binary, retrieve the Secret for it
-			imagePullSecret, err := client.CoreV1().Secrets(namespace).Get(context.Background(), secret, metav1.GetOptions{})
+			imagePullSecret, err := client.CoreV1().Secrets(namespace).Get(ctx, secret, metav1.GetOptions{})
 			if err != nil {
-				return nil, fmt.Errorf("misconfigured Plugin: name: %s, platform: %s, error while getting imagePullSecret %s: %v", plugin.Name, p, p.ImagePullSecret, err)
+				newCondition := metav1.Condition{
+					Status:  metav1.ConditionFalse,
+					Reason:  "InvalidField",
+					Message: fmt.Sprintf("error occurred %s while getting the secret %s", err, secret),
+				}
+				if errors.IsNotFound(err) {
+					newCondition.Message = fmt.Sprintf("secret %s is not found. If secret is in another namespace, please prepend namespace as anotherns/secret_name format", secret)
+				}
+				err := updateStatusCondition(ctx, plugin, dynamicClient, newCondition)
+				if err != nil {
+					return nil, false, err
+				}
+				return nil, false, nil
 			}
 
 			// ensure the Secret is of the expected type
 			if imagePullSecret.Type != corev1.SecretTypeDockercfg && imagePullSecret.Type != corev1.SecretTypeDockerConfigJson {
-				return nil, fmt.Errorf("misconfigured Plugin: name: %s, platform: %s, error: configured imagePullSecret %s for given platform combination is not of type: %s or %s", plugin.Name, p, p.ImagePullSecret, corev1.SecretTypeDockercfg, corev1.SecretTypeDockerConfigJson)
+				newCondition := metav1.Condition{
+					Status:  metav1.ConditionFalse,
+					Reason:  "InvalidSecretType",
+					Message: fmt.Sprintf("image pull secret type %s is not supported, only kubernetes.io/dockercfg and kubernetes.io/dockerconfigjson are supported", imagePullSecret.Type),
+				}
+				err := updateStatusCondition(ctx, plugin, dynamicClient, newCondition)
+				if err != nil {
+					return nil, false, err
+				}
+				return nil, false, nil
 			}
 
 			if imagePullSecret.Type == corev1.SecretTypeDockercfg {
@@ -212,10 +299,21 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, ro
 				var dcr *DockerConfigJson
 				err = json.Unmarshal(imagePullSecret.Data[corev1.DockerConfigJsonKey], &dcr)
 				if err != nil || dcr == nil {
-					return nil, fmt.Errorf("unable to parse dockerjson %s to json", imagePullSecret.Name)
+					newCondition := metav1.Condition{
+						Status:  metav1.ConditionFalse,
+						Reason:  "InvalidField",
+						Message: fmt.Sprintf("unable to parse dockerjson %s to json", imagePullSecret.Name),
+					}
+					err := updateStatusCondition(ctx, plugin, dynamicClient, newCondition)
+					if err != nil {
+						return nil, false, err
+					}
+					return nil, false, nil
 				}
-				for _, val := range dcr.Auths {
-					imageAuth = val.Auth
+				for key, val := range dcr.Auths {
+					if strings.Contains(p.Image, key+"/") {
+						imageAuth = val.Auth
+					}
 				}
 			}
 		}
@@ -223,35 +321,79 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, ro
 		// attempt to pull the image down locally
 		img, err := image.Pull(p.Image, imageAuth)
 		if err != nil {
-			return nil, fmt.Errorf("could not pull image: name: %s, error: %v for Plugin: name: %s, platform: %s", p.Image, err, plugin.Name, p)
+			newCondition := metav1.Condition{
+				Status:  metav1.ConditionFalse,
+				Reason:  "ImagePullError",
+				Message: fmt.Sprintf("failed to pull the image error %s", err),
+			}
+			err := updateStatusCondition(ctx, plugin, dynamicClient, newCondition)
+			if err != nil {
+				return nil, false, err
+			}
+			return nil, false, nil
 		}
 
-		os.RemoveAll(fmt.Sprintf("%s/%s_*.tar.gz", image.TarballPath, plugin.Name))
 		destinationFileName := fmt.Sprintf("%s/%s_%s.tar.gz", image.TarballPath, plugin.Name, strings.ReplaceAll(p.Platform, "/", "_"))
 		files, err := image.Extract(img, p, destinationFileName)
 		if err != nil {
-			return nil, err
+			newCondition := metav1.Condition{
+				Status:  metav1.ConditionFalse,
+				Reason:  "ExtractFromImageError",
+				Message: fmt.Sprintf("failed to extract the binary from image error %s", err),
+			}
+			err := updateStatusCondition(ctx, plugin, dynamicClient, newCondition)
+			if err != nil {
+				return nil, false, err
+			}
+			return nil, false, nil
 		}
 
 		if len(files) == 0 {
-			return nil, fmt.Errorf("files are not found in the given From path in image")
+			newCondition := metav1.Condition{
+				Status:  metav1.ConditionFalse,
+				Reason:  "BinaryNotFound",
+				Message: fmt.Sprintf("failed to find the binary from image, path should not be directory, symlink"),
+			}
+			err := updateStatusCondition(ctx, plugin, dynamicClient, newCondition)
+			if err != nil {
+				return nil, false, err
+			}
+			return nil, false, nil
 		}
 
 		dest, err := os.Open(destinationFileName)
 		if err != nil {
-			return nil, err
+			newCondition := metav1.Condition{
+				Status:  metav1.ConditionFalse,
+				Reason:  "BinaryNotFound",
+				Message: fmt.Sprintf("failed to open the extracted binary %s", err),
+			}
+			err := updateStatusCondition(ctx, plugin, dynamicClient, newCondition)
+			if err != nil {
+				return nil, false, err
+			}
+			return nil, false, nil
 		}
 		hash := sha256.New()
 		if _, err := io.Copy(hash, dest); err != nil {
 			dest.Close()
-			return nil, fmt.Errorf("could not calculate sha256 checksum: name: %s, error: %v for Plugin: name: %s, platform: %s", p.Image, err, plugin.Name, p)
+			newCondition := metav1.Condition{
+				Status:  metav1.ConditionFalse,
+				Reason:  "Sha256ChecksumError",
+				Message: fmt.Sprintf("could not calculate sha256 checksum"),
+			}
+			err := updateStatusCondition(ctx, plugin, dynamicClient, newCondition)
+			if err != nil {
+				return nil, false, err
+			}
+			return nil, false, nil
 		}
 
 		checksum := hex.EncodeToString(hash.Sum(nil))
 
-		r, err := route.Routes("openshift-cli-manager-operator").Get(context.Background(), "openshift-cli-manager", metav1.GetOptions{})
+		r, err := route.Routes("openshift-cli-manager-operator").Get(ctx, "openshift-cli-manager", metav1.GetOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("could not get the route openshift-cli-manager in openshift-cli-manager-operator namespace err: %w", err)
+			return nil, false, fmt.Errorf("could not get the route openshift-cli-manager in openshift-cli-manager-operator namespace err: %w", err)
 		}
 
 		artifactURI := fmt.Sprintf("https://%s/cli-manager/plugins/download/?name=%s&platform=%s", r.Spec.Host, plugin.Name, strings.ReplaceAll(p.Platform, "/", "_"))
@@ -259,7 +401,6 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, ro
 			artifactURI = fmt.Sprintf("http://%s/cli-manager/plugins/download/?name=%s&platform=%s", r.Spec.Host, plugin.Name, strings.ReplaceAll(p.Platform, "/", "_"))
 		}
 
-		klog.Infof("plugin %s is ready to be served", plugin.Name)
 		kp := krew.Platform{
 			URI:    artifactURI,
 			Sha256: checksum,
@@ -280,10 +421,47 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, ro
 			})
 		}
 		if len(kp.Bin) == 0 {
-			kp.Bin = kp.Files[0].From
+			kp.Bin = plugin.Name
 		}
 		k.Spec.Platforms = append(k.Spec.Platforms, kp)
 	}
 
-	return k, nil
+	klog.Infof("plugin %s is ready to be served", plugin.Name)
+	newCondition := metav1.Condition{
+		Status:  metav1.ConditionTrue,
+		Reason:  "Installed",
+		Message: fmt.Sprintf("plugin %s is ready to be served", plugin.Name),
+	}
+	err = updateStatusCondition(ctx, plugin, dynamicClient, newCondition)
+	if err != nil {
+		return nil, false, err
+	}
+	return k, true, nil
+}
+
+func updateStatusCondition(ctx context.Context, plugin *v1alpha1.Plugin, dynamic *dynamic.DynamicClient, condition metav1.Condition) error {
+	condition.Type = "PluginInstalled"
+	condition.LastTransitionTime = metav1.NewTime(time.Now())
+	for _, conds := range plugin.Status.Conditions {
+		if conds.Reason == condition.Reason && conds.Status == condition.Status && conds.Message == condition.Message {
+			// No need to update again
+			return nil
+		}
+	}
+	plugin.Status.Conditions = []metav1.Condition{condition}
+	unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(plugin)
+	unObj := &unstructured.Unstructured{
+		Object: unstructuredMap,
+	}
+	if err != nil {
+		return fmt.Errorf("unexpected object decoding error %w", err)
+	}
+	_, err = dynamic.Resource(schema.GroupVersionResource{
+		Group:    "config.openshift.io",
+		Version:  "v1alpha1",
+		Resource: "plugins"}).UpdateStatus(ctx, unObj, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("plugin condition update error %w", err)
+	}
+	return nil
 }

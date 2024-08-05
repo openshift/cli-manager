@@ -33,11 +33,10 @@ The spec has the following fields:
 
 Example:
 ```yaml
-apiVersion: config.openshift.io/v1
+apiVersion: config.openshift.io/v1alpha1
 kind: Plugin
 metadata:
   name: bash
-  namespace: default
 spec:
   shortDescription: just a test
   description: just a test
@@ -59,9 +58,9 @@ In order to configure CLI Manager;
 * Krew is installed. More details can be found https://krew.sigs.k8s.io/docs/user-guide/setup/install/
 * Custom index provided by OpenShift CLI Manager is defined in Krew;
 ```sh
-$ ROUTE=$(oc get route/cli-manager -n openshift-cli-manager -o=jsonpath='{.spec.host}')
+$ ROUTE=$(oc get route/openshift-cli-manager -n openshift-cli-manager-operator -o=jsonpath='{.spec.host}')
 $ CUSTOM_INDEX_NAME=ocp
-$ oc krew add index $CUSTOM_INDEX_NAME https://$ROUTE/cli-manager
+$ oc krew index add $CUSTOM_INDEX_NAME https://$ROUTE/cli-manager
 ```
 
 To search, install or remove a plugin;

@@ -36,7 +36,7 @@ func init() {
 	buildInfo := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "openshift_cli_manager_operator",
-			Help: "A metric with a constant '1' value labeled by major, minor, git commit & git version from which OpenShift Network Operator was built.",
+			Help: "A metric with a constant '1' value labeled by major, minor, git commit & git version from which CLI Manager was built.",
 		},
 		[]string{"major", "minor", "gitCommit", "gitVersion"},
 	)

@@ -23,6 +23,7 @@ import (
 
 	"github.com/openshift/cli-manager/pkg/image"
 	krew "github.com/openshift/cli-manager/pkg/krew/v1alpha2"
+	"github.com/openshift/cli-manager/pkg/metrics"
 )
 
 const GitRepoPath = "/var/run/git/cli-manager"
@@ -172,9 +173,18 @@ func PrepareLocalGit() (*Repo, error) {
 // endpoints in addition to plugin download mechanism.
 func PrepareGitServer() *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/cli-manager/plugins/download/", HandleDownloadPlugin)
-	mux.HandleFunc("/cli-manager/info/refs", HandleGitAdversitement)
-	mux.HandleFunc("/cli-manager/git-upload-pack", HandleGitUploadPack)
+	mux.HandleFunc("/cli-manager/plugins/download/", func(writer http.ResponseWriter, request *http.Request) {
+		metrics.GitAPIRequestCounts.WithLabelValues("/cli-manager/plugins/download/").Inc()
+		HandleDownloadPlugin(writer, request)
+	})
+	mux.HandleFunc("/cli-manager/info/refs", func(writer http.ResponseWriter, request *http.Request) {
+		metrics.GitAPIRequestCounts.WithLabelValues("/cli-manager/info/refs").Inc()
+		HandleGitAdversitement(writer, request)
+	})
+	mux.HandleFunc("/cli-manager/git-upload-pack", func(writer http.ResponseWriter, request *http.Request) {
+		metrics.GitAPIRequestCounts.WithLabelValues("/cli-manager/git-upload-pack").Inc()
+		HandleGitUploadPack(writer, request)
+	})
 	mux.HandleFunc("/healthz", func(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusOK)
 	})

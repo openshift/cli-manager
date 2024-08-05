@@ -2,17 +2,20 @@ package cli_manager
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
-	routeclient "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
-	"github.com/openshift/library-go/pkg/controller/controllercmd"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
+	routeclient "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
+	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
 	"github.com/openshift/cli-manager/pkg/controller"
 	"github.com/openshift/cli-manager/pkg/git"
@@ -46,12 +49,16 @@ func RunCLIManager(ctx context.Context, controllerContext *controllercmd.Control
 	}
 
 	informers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 0)
-	cliSyncController, err := controller.NewCLISyncController(repo, informers, client, route, ServeArtifactAsHttp, controllerContext.EventRecorder)
+	cliSyncController, err := controller.NewCLISyncController(repo, informers, client, dynamicClient, route, ServeArtifactAsHttp, controllerContext.EventRecorder)
 	if err != nil {
 		return err
 	}
 
+	informers.Start(ctx.Done())
+	informers.WaitForCacheSync(ctx.Done())
+
 	mux := git.PrepareGitServer()
+	mux.Handle("/metrics", promhttp.Handler())
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", PortNumber),
 		Handler:      mux,
@@ -59,6 +66,7 @@ func RunCLIManager(ctx context.Context, controllerContext *controllercmd.Control
 		WriteTimeout: 15 * time.Minute,
 		// 1MB size should be sufficient
 		MaxHeaderBytes: 1 << 20,
+		TLSNextProto:   map[string]func(*http.Server, *tls.Conn, http.Handler){}, // disable HTTP/2
 	}
 
 	go func() {
@@ -66,7 +74,6 @@ func RunCLIManager(ctx context.Context, controllerContext *controllercmd.Control
 			klog.Errorf("git server exited with error %s", err.Error())
 		}
 	}()
-	go informers.Start(ctx.Done())
 	go cliSyncController.Run(ctx, 1)
 	<-ctx.Done()
 	return nil

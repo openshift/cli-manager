@@ -50,10 +50,14 @@ func Extract(img v1.Image, platform v1alpha1.PluginPlatform, destinationName str
 	tw := tar.NewWriter(gw)
 	defer tw.Close()
 
+	foundLen := 0
 	// we iterate through the layers in reverse order because it makes handling
 	// whiteout layers more efficient, since we can just keep track of the removed
 	// files as we see .wh. layers and ignore those in previous layers.
 	for i := len(layers) - 1; i >= 0; i-- {
+		if foundLen == len(platform.Files) {
+			break
+		}
 		layer := layers[i]
 		layerReader, err := layer.Uncompressed()
 		if err != nil {
@@ -107,8 +111,12 @@ func Extract(img v1.Image, platform v1alpha1.PluginPlatform, destinationName str
 					if _, err := io.Copy(tw, tarReader); err != nil {
 						continue
 					}
+					foundLen++
 					break
 				}
+			}
+			if foundLen == len(platform.Files) {
+				break
 			}
 		}
 		layerReader.Close()
