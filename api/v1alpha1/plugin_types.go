@@ -52,7 +52,7 @@ type PluginPlatform struct {
 	// Bin specifies the path to the plugin executable.
 	// The path is relative to the root of the installation folder.
 	// The binary will be linked after all FileOperations are executed.
-	// If not specified, the first From item in the Files is set.
+	// If not specified, plugin name is set.
 	// +optional
 	Bin string `json:"bin"`
 }
@@ -61,7 +61,7 @@ type PluginPlatform struct {
 // installation directory.
 type FileLocation struct {
 	// From is the absolute file path within the image to copy from.
-	// Directories and wildcards are not currently supported.
+	// Directories, wildcards and symlinks are not supported.
 	// +required
 	From string `json:"from"`
 
@@ -73,7 +73,14 @@ type FileLocation struct {
 }
 
 // PluginStatus defines the observed state of Plugin.
-type PluginStatus struct{}
+type PluginStatus struct {
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status

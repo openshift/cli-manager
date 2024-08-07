@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/openshift/cli-manager/api/v1alpha1"
 	"net/http"
 	"os"
 	"os/exec"
@@ -18,6 +19,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	machineryruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -345,6 +347,25 @@ func TestCLIManager(t *testing.T) {
 	klog.Infof("plugin oc execution result \n %s", string(ver))
 	if !strings.Contains(string(ver), "Client Version:") {
 		t.Fatalf("unexpected output of plugin execution %s", string(ver))
+	}
+
+	unstrctrd, err := dynamicClient.Resource(schema.GroupVersionResource{Group: "config.openshift.io", Version: "v1alpha1", Resource: "plugins"}).Get(context.TODO(), "oc", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("test plugin retrieval error %v", err)
+	}
+
+	latestPlugin := &v1alpha1.Plugin{}
+	err = machineryruntime.DefaultUnstructuredConverter.FromUnstructured(unstrctrd.UnstructuredContent(), latestPlugin)
+	if err != nil {
+		t.Fatalf("test plugin conversion error %v", err)
+	}
+
+	if len(latestPlugin.Status.Conditions) == 0 {
+		t.Fatalf("unexpected empty condition of plugin oc")
+	}
+
+	if latestPlugin.Status.Conditions[0].Status != metav1.ConditionTrue || latestPlugin.Status.Conditions[0].Reason != "Installed" {
+		t.Fatalf("unexpected condition of plugin %s reason %s", latestPlugin.Status.Conditions[0].Status, latestPlugin.Status.Conditions[0].Reason)
 	}
 }
 
