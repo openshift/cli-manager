@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -18,15 +19,34 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
 
 	"github.com/openshift/cli-manager/pkg/image"
 	krew "github.com/openshift/cli-manager/pkg/krew/v1alpha2"
-	"github.com/openshift/cli-manager/pkg/metrics"
 )
 
 const GitRepoPath = "/var/run/git/cli-manager"
+
+var (
+	registerControllerMetrics sync.Once
+	gitAPIRequestCounts       = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "cli_manager_git_api_requests_total",
+			Help:           "Total counts of Git API requests",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"name"},
+	)
+)
+
+func init() {
+	registerControllerMetrics.Do(func() {
+		legacyregistry.MustRegister(gitAPIRequestCounts)
+	})
+}
 
 type Repo struct {
 	repo *git.Repository
@@ -174,15 +194,15 @@ func PrepareLocalGit() (*Repo, error) {
 func PrepareGitServer() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/cli-manager/plugins/download/", func(writer http.ResponseWriter, request *http.Request) {
-		metrics.GitAPIRequestCounts.WithLabelValues("/cli-manager/plugins/download/").Inc()
+		gitAPIRequestCounts.WithLabelValues("/cli-manager/plugins/download/").Inc()
 		HandleDownloadPlugin(writer, request)
 	})
 	mux.HandleFunc("/cli-manager/info/refs", func(writer http.ResponseWriter, request *http.Request) {
-		metrics.GitAPIRequestCounts.WithLabelValues("/cli-manager/info/refs").Inc()
+		gitAPIRequestCounts.WithLabelValues("/cli-manager/info/refs").Inc()
 		HandleGitAdversitement(writer, request)
 	})
 	mux.HandleFunc("/cli-manager/git-upload-pack", func(writer http.ResponseWriter, request *http.Request) {
-		metrics.GitAPIRequestCounts.WithLabelValues("/cli-manager/git-upload-pack").Inc()
+		gitAPIRequestCounts.WithLabelValues("/cli-manager/git-upload-pack").Inc()
 		HandleGitUploadPack(writer, request)
 	})
 	mux.HandleFunc("/healthz", func(writer http.ResponseWriter, request *http.Request) {
