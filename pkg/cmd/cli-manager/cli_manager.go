@@ -22,7 +22,10 @@ import (
 )
 
 const (
-	PortNumber = 9449
+	PortNumber        = 9449
+	MetricsPortNumber = 8443
+	tlsCRT            = "/etc/secrets/tls.crt"
+	tlsKey            = "/etc/secrets/tls.key"
 )
 
 var ServeArtifactAsHttp bool
@@ -58,7 +61,6 @@ func RunCLIManager(ctx context.Context, controllerContext *controllercmd.Control
 	informers.WaitForCacheSync(ctx.Done())
 
 	mux := git.PrepareGitServer()
-	mux.Handle("/metrics", promhttp.Handler())
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", PortNumber),
 		Handler:      mux,
@@ -74,6 +76,20 @@ func RunCLIManager(ctx context.Context, controllerContext *controllercmd.Control
 			klog.Errorf("git server exited with error %s", err.Error())
 		}
 	}()
+
+	metricsMux := http.NewServeMux()
+	metricsMux.Handle("/metrics", promhttp.Handler())
+	metricsServer := &http.Server{
+		Addr:    fmt.Sprintf(":%d", MetricsPortNumber),
+		Handler: metricsMux,
+	}
+
+	go func() {
+		if err := metricsServer.ListenAndServeTLS(tlsCRT, tlsKey); !errors.Is(err, http.ErrServerClosed) {
+			klog.Errorf("git server exited with error %s", err.Error())
+		}
+	}()
+
 	go cliSyncController.Run(ctx, 1)
 	<-ctx.Done()
 	return nil
