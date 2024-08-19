@@ -8,6 +8,7 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	targets/openshift/deps.mk \
 )
 
+GO_BUILD_FLAGS :=-tags strictfipsruntime
 IMAGE_REGISTRY :=registry.ci.openshift.org
 
 # This will call a macro called "build-image" which will generate image specific targets based on the parameters:
@@ -16,7 +17,7 @@ IMAGE_REGISTRY :=registry.ci.openshift.org
 # $2 - image ref
 # $3 - Dockerfile path
 # $4 - context directory for image build# It will generate target "image-$(1)" for building the image an binding it as a prerequisite to target "images".
-$(call build-image,cli-manager,$(IMAGE_REGISTRY)/ocp/dev:cli-manager, ./Dockerfile,.)
+$(call build-image,cli-manager,$(IMAGE_REGISTRY)/ocp/4.17:cli-manager, ./Dockerfile,.)
 
 clean:
 	$(RM) ./cli-manager
