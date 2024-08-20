@@ -23,7 +23,7 @@ import (
 
 const (
 	PortNumber        = 9449
-	MetricsPortNumber = 8443
+	MetricsPortNumber = 60000
 	tlsCRT            = "/etc/secrets/tls.crt"
 	tlsKey            = "/etc/secrets/tls.key"
 )
@@ -86,7 +86,7 @@ func RunCLIManager(ctx context.Context, controllerContext *controllercmd.Control
 
 	go func() {
 		if err := metricsServer.ListenAndServeTLS(tlsCRT, tlsKey); !errors.Is(err, http.ErrServerClosed) {
-			klog.Errorf("git server exited with error %s", err.Error())
+			klog.Errorf("metrics server exited with error %s", err.Error())
 		}
 	}()
 
