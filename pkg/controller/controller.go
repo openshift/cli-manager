@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 	routeclient "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -319,7 +320,10 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, dy
 		}
 
 		// attempt to pull the image down locally
-		img, err := image.Pull(p.Image, imageAuth)
+		img, err := image.Pull(p.Image, imageAuth, &v1.Platform{
+			Architecture: fields[1],
+			OS:           fields[0],
+		})
 		if err != nil {
 			newCondition := metav1.Condition{
 				Status:  metav1.ConditionFalse,
