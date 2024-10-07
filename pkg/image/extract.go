@@ -19,13 +19,17 @@ import (
 const TarballPath = "/var/run/plugins/"
 
 // Pull an image down to the local filesystem.
-func Pull(src string, auth string) (v1.Image, error) {
+func Pull(src string, auth string, platform *v1.Platform) (v1.Image, error) {
 	craneOptions := []crane.Option{}
 	if len(auth) > 0 {
 		auth := authn.FromConfig(authn.AuthConfig{
 			Auth: auth,
 		})
 		craneOptions = append(craneOptions, crane.WithAuth(auth))
+	}
+
+	if platform != nil {
+		craneOptions = append(craneOptions, crane.WithPlatform(platform))
 	}
 
 	return crane.Pull(src, craneOptions...)
