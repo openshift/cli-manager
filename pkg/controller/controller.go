@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -229,6 +230,7 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, dy
 		}
 		return nil, false, nil
 	}
+
 	k := &krew.Plugin{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "krew.googlecontainertools.github.com/v1alpha2",
@@ -249,6 +251,35 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, dy
 		fields := strings.SplitN(p.Platform, "/", 2)
 		if len(fields) < 2 {
 			continue
+		}
+
+		var proxyURL *url.URL
+		if p.ProxyURL != "" {
+			proxyURL, err = url.Parse(p.ProxyURL)
+			if err != nil {
+				newCondition := metav1.Condition{
+					Status:  metav1.ConditionFalse,
+					Reason:  "InvalidField",
+					Message: fmt.Sprintf("invalid proxy URL %s error: %s", p.ProxyURL, err),
+				}
+				err := updateStatusCondition(ctx, plugin, dynamicClient, newCondition)
+				if err != nil {
+					return nil, false, err
+				}
+				return nil, false, nil
+			}
+			if proxyURL.Scheme == "http" {
+				newCondition := metav1.Condition{
+					Status:  metav1.ConditionFalse,
+					Reason:  "InvalidField",
+					Message: fmt.Sprintf("http is not supported for proxy url %s", p.ProxyURL),
+				}
+				err := updateStatusCondition(ctx, plugin, dynamicClient, newCondition)
+				if err != nil {
+					return nil, false, err
+				}
+				return nil, false, nil
+			}
 		}
 
 		var imageAuth string
@@ -323,7 +354,7 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, dy
 		img, err := image.Pull(p.Image, imageAuth, &v1.Platform{
 			Architecture: fields[1],
 			OS:           fields[0],
-		})
+		}, p.CABundle, proxyURL)
 		if err != nil {
 			newCondition := metav1.Condition{
 				Status:  metav1.ConditionFalse,
