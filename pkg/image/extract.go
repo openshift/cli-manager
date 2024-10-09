@@ -3,8 +3,13 @@ package image
 import (
 	"archive/tar"
 	"compress/gzip"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +17,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 
 	"github.com/openshift/cli-manager/api/v1alpha1"
 )
@@ -19,7 +25,7 @@ import (
 const TarballPath = "/var/run/plugins/"
 
 // Pull an image down to the local filesystem.
-func Pull(src string, auth string, platform *v1.Platform) (v1.Image, error) {
+func Pull(src string, auth string, platform *v1.Platform, ca string, proxy *url.URL) (v1.Image, error) {
 	craneOptions := []crane.Option{}
 	if len(auth) > 0 {
 		auth := authn.FromConfig(authn.AuthConfig{
@@ -32,6 +38,30 @@ func Pull(src string, auth string, platform *v1.Platform) (v1.Image, error) {
 		craneOptions = append(craneOptions, crane.WithPlatform(platform))
 	}
 
+	transport := remote.DefaultTransport.(*http.Transport).Clone()
+	if ca != "" {
+		caBytes, err := base64.StdEncoding.DecodeString(ca)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding CA certificate: %w", err)
+		}
+		rootCAs := x509.NewCertPool()
+		if !rootCAs.AppendCertsFromPEM(caBytes) {
+			return nil, fmt.Errorf("invalid CA certificate passed in")
+		}
+		if !rootCAs.Equal(x509.NewCertPool()) {
+			if transport.TLSClientConfig == nil {
+				transport.TLSClientConfig = &tls.Config{}
+			}
+			transport.TLSClientConfig.RootCAs = rootCAs
+		}
+	}
+
+	if proxy != nil {
+		transport.Proxy = http.ProxyURL(proxy)
+	}
+
+	var rt http.RoundTripper = transport
+	craneOptions = append(craneOptions, crane.WithTransport(rt))
 	return crane.Pull(src, craneOptions...)
 }
 
