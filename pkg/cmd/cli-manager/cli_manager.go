@@ -25,13 +25,14 @@ const (
 	PortNumber        = 9449
 	MetricsPortNumber = 60000
 	tlsCRT            = "/etc/secrets/tls.crt"
-	tlsKey            = "/etc/secrets/tls.key"
+	tlsKey            = "/etc/secrets/tls.key "
 )
 
 var ServeArtifactAsHttp bool
 
 func RunCLIManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	dynamicClient, err := dynamic.NewForConfig(controllerContext.KubeConfig)
+
 	if err != nil {
 		return err
 	}
