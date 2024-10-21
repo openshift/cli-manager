@@ -38,6 +38,10 @@ import (
 	krew "github.com/openshift/cli-manager/pkg/krew/v1alpha2"
 )
 
+var (
+	platformRegex = regexp.MustCompile("^(linux|darwin|windows)/(arm64|amd64|ppc64le|s390x)$")
+)
+
 type DockerConfigJson struct {
 	Auths DockerConfig `json:"auths"`
 }
@@ -231,6 +235,21 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, dy
 		return nil, false, nil
 	}
 
+	for _, p := range plugin.Spec.Platforms {
+		if !platformRegex.MatchString(p.Platform) {
+			newCondition := metav1.Condition{
+				Status:  metav1.ConditionFalse,
+				Reason:  "InvalidField",
+				Message: fmt.Sprintf("invalid platform %s, please ensure that OS (linux/darwin/windows) and arch (arm64/amd64/ppc64le/s390x) are supported and in linux/amd64 format", p.Platform),
+			}
+			err := updateStatusCondition(ctx, plugin, dynamicClient, newCondition)
+			if err != nil {
+				return nil, false, err
+			}
+			return nil, false, nil
+		}
+	}
+
 	k := &krew.Plugin{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "krew.googlecontainertools.github.com/v1alpha2",
@@ -249,10 +268,6 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, dy
 	}
 	for _, p := range plugin.Spec.Platforms {
 		fields := strings.SplitN(p.Platform, "/", 2)
-		if len(fields) < 2 {
-			continue
-		}
-
 		var proxyURL *url.URL
 		if p.ProxyURL != "" {
 			proxyURL, err = url.Parse(p.ProxyURL)
@@ -350,10 +365,18 @@ func convertKrewPlugin(plugin *v1alpha1.Plugin, client *kubernetes.Clientset, dy
 			}
 		}
 
+		osStr := fields[0]
+		archStr := fields[1]
+		if osStr == "windows" || osStr == "darwin" {
+			// if the binary is either windows or darwin,
+			// try to get it from linux/amd64 image
+			osStr = "linux"
+			archStr = "amd64"
+		}
 		// attempt to pull the image down locally
 		img, err := image.Pull(p.Image, imageAuth, &v1.Platform{
-			Architecture: fields[1],
-			OS:           fields[0],
+			Architecture: archStr,
+			OS:           osStr,
 		}, p.CABundle, proxyURL)
 		if err != nil {
 			newCondition := metav1.Condition{
