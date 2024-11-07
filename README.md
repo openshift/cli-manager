@@ -29,7 +29,7 @@ The spec has the following fields:
     * `files`: List of files to pull from the image using absolute paths and where they should be installed relative to the installation's root directory
       * `from`: Absolute path to a file, directories and wildcards are not yet supported
       * `to`: Relative path to install the file, or `.` for installation root directory
-    * `bin`: Name of the binary to execute
+    * `bin`: Name of the binary to execute (optional, if not set plugin name will be used)
 
 Example:
 ```yaml
