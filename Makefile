@@ -38,6 +38,7 @@ install-krew:
 
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...
 
+
 test-e2e: GO_TEST_PACKAGES :=./test/e2e
 # the e2e imports pkg/cmd which has a data race in the transport library with the library-go init code
 test-e2e: GO_TEST_FLAGS :=-v -timeout=3h
