@@ -30,6 +30,7 @@ const (
 
 var ServeArtifactAsHttp bool
 
+// RunCLIManager runs the controller and servers
 func RunCLIManager(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
 	dynamicClient, err := dynamic.NewForConfig(controllerContext.KubeConfig)
 	if err != nil {
