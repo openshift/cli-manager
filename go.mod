@@ -6,7 +6,7 @@ require (
 	github.com/go-git/go-git/v5 v5.13.0
 	github.com/google/go-containerregistry v0.20.2
 	github.com/openshift/api v0.0.0-20241001152557-e415140e5d5f
-	github.com/openshift/build-machinery-go v0.0.0-20240910153727-5725581bdf8f
+	github.com/openshift/build-machinery-go v0.0.0-20250211133638-a00a772ae1a2
 	github.com/openshift/client-go v0.0.0-20241001162912-da6d55e4611f
 	github.com/openshift/library-go v0.0.0-20241001171606-756adf2188fc
 	github.com/prometheus/client_golang v1.19.1
