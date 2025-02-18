@@ -7,6 +7,7 @@ import (
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/clock"
 
 	"github.com/openshift/cli-manager/pkg/version"
 )
@@ -17,7 +18,7 @@ const (
 )
 
 func NewCLIManagerCommand(name string, supportHttp bool) *cobra.Command {
-	cmd := controllercmd.NewControllerCommandConfig("cli-manager", version.Get(), RunCLIManager).
+	cmd := controllercmd.NewControllerCommandConfig("cli-manager", version.Get(), RunCLIManager, clock.RealClock{}).
 		WithComponentOwnerReference(&corev1.ObjectReference{
 			Kind:      "Pod",
 			Name:      os.Getenv(podNameEnv),
