@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/openshift/cli-manager/api/v1alpha1"
 	"net/http"
 	"os"
 	"os/exec"
@@ -27,6 +26,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 
 	routev1 "github.com/openshift/api/route/v1"
 	routev1client "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
@@ -35,6 +35,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 
+	"github.com/openshift/cli-manager/api/v1alpha1"
 	"github.com/openshift/cli-manager/test/e2e/bindata"
 )
 
@@ -58,7 +59,7 @@ func TestMain(m *testing.M) {
 	apiExtClient := getApiExtensionKubeClient()
 	routeClient := getRouteClient()
 
-	eventRecorder := events.NewKubeRecorder(kubeClient.CoreV1().Events("default"), "test-e2e", &corev1.ObjectReference{})
+	eventRecorder := events.NewKubeRecorder(kubeClient.CoreV1().Events("default"), "test-e2e", &corev1.ObjectReference{}, clock.RealClock{})
 
 	ctx, cancelFnc := context.WithCancel(context.TODO())
 	defer cancelFnc()
