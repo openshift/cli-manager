@@ -11,7 +11,8 @@ COPY --from=builder /go/src/github.com/openshift/cli-manager/LICENSE /licenses/.
 
 LABEL com.redhat.component="CLI Manager"
 LABEL description="The CLI Manager is a comprehensive tool designed to simplify the management of OpenShift CLI plugins within the OpenShift environment. Modeled after the popular krew plugin manager, it offers seamless integration, easy installation, and efficient handling of a wide array of plugins, enhancing your OpenShift command-line experience."
-LABEL name="cli-manager"
+LABEL name="cli-manager-operator/cli-manager-rhel9"
+LABEL cpe="cpe:/a:redhat:cli_manager_operator:0.1::el9"
 LABEL summary="The CLI Manager is a comprehensive tool designed to simplify the management of OpenShift CLI plugins within the OpenShift environment. Modeled after the popular krew plugin manager, it offers seamless integration, easy installation, and efficient handling of a wide array of plugins, enhancing your OpenShift command-line experience."
 LABEL io.k8s.display-name="CLI Manager" \
       io.k8s.description="The CLI Manager is a comprehensive tool designed to simplify the management of OpenShift CLI plugins within the OpenShift environment. Modeled after the popular krew plugin manager, it offers seamless integration, easy installation, and efficient handling of a wide array of plugins, enhancing your OpenShift command-line experience." \
