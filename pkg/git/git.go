@@ -321,8 +321,8 @@ func HandleDownloadPlugin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fileName := fmt.Sprintf("%s_%s.tar.gz", name, platform)
-	filePath := fmt.Sprintf("%s/%s", image.TarballPath, fileName)
-	f, err := os.Open(filepath.Clean(filePath))
+	filePath := filepath.Join(image.TarballPath, filepath.Base(fileName))
+	f, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			http.Error(w, err.Error(), http.StatusNotFound)
