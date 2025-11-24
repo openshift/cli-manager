@@ -20,7 +20,7 @@ LABEL vendor="Red Hat, Inc."
 LABEL summary="The CLI Manager is a comprehensive tool designed to simplify the management of OpenShift CLI plugins within the OpenShift environment. Modeled after the popular krew plugin manager, it offers seamless integration, easy installation, and efficient handling of a wide array of plugins, enhancing your OpenShift command-line experience."
 LABEL io.k8s.display-name="CLI Manager" \
       io.k8s.description="The CLI Manager is a comprehensive tool designed to simplify the management of OpenShift CLI plugins within the OpenShift environment. Modeled after the popular krew plugin manager, it offers seamless integration, easy installation, and efficient handling of a wide array of plugins, enhancing your OpenShift command-line experience." \
-      io.openshift.tags="openshift,cli-manager" \
+      io.openshift.tags="openshift,cli-manager,cli" \
       com.redhat.delivery.appregistry=true \
       distribution-scope=public
 USER 1001
