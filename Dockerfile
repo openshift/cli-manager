@@ -3,7 +3,7 @@ WORKDIR /go/src/github.com/openshift/cli-manager
 COPY . .
 RUN make build --warn-undefined-variables
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:83006d535923fcf1345067873524a3980316f51794f01d8655be55d6e9387183
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:fe688da81a696387ca53a4c19231e99289591f990c904ef913c51b6e87d4e4df
 COPY --from=builder /go/src/github.com/openshift/cli-manager/cli-manager /usr/bin/
 COPY --from=builder /usr/bin/git /usr/bin/git
 RUN mkdir /licenses
