@@ -40,7 +40,7 @@ metadata:
 spec:
   shortDescription: just a test
   description: just a test
-  version: v4.4.20
+  version: v4.4.21
   platforms:
   - platform: linux/amd64
     image: redhat/ubi8-micro:latest
