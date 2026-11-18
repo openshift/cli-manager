@@ -9,6 +9,10 @@ bin
 testbin/*
 Dockerfile.cross
 
+# Build artifacts
+/cli-manager
+/cli-manager-testing
+
 # Test binary, build with `go test -c`
 *.test
 
